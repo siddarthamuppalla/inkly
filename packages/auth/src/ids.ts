@@ -1,4 +1,4 @@
-import type { TenantId, UserId } from "@inkly/domain";
+import type { DocumentId, TenantId, UserId } from "@inkly/domain";
 
 // ADR-0004: TenantId and UserId are minted only here. Phase 1 adds the
 // membership check that turns a session into an Active tenant's TenantId.
@@ -15,4 +15,9 @@ export function mintTenantId(): TenantId {
 /** A new, unused UserId for a User being created. */
 export function mintUserId(): UserId {
   return newId("usr") as UserId;
+}
+
+/** A new DocumentId. */
+export function mintDocumentId(): DocumentId {
+  return newId("doc") as DocumentId;
 }

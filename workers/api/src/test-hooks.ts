@@ -1,5 +1,7 @@
-import { mintTenantId, mintUserId } from "@inkly/auth";
-import { createTenant, createUser } from "@inkly/storage";
+import { issueSession, mintTenantId, mintUserId } from "@inkly/auth";
+import type { TenantId } from "@inkly/domain";
+import { isWellFormedId } from "@inkly/domain";
+import { createTenant, createUser, listAccessLog } from "@inkly/storage";
 import { Hono } from "hono";
 
 import type { Env } from "./env.ts";
@@ -35,5 +37,13 @@ testHooks.post("/seed", async (c) => {
   const email = `${userId}@seed.inkly.test`;
   await createTenant(tenantId, c.env, `Seed ${tenantId}`);
   await createUser(tenantId, c.env, { id: userId, email });
-  return c.json({ tenantId, userId, email }, 201);
+  const token = await issueSession(tenantId, userId, c.env);
+  return c.json({ tenantId, userId, email, token }, 201);
+});
+
+// Lets verify-tenancy count the access-log entries its denied attempts produced.
+testHooks.get("/access-log", async (c) => {
+  const tenant = c.req.query("tenant") ?? "";
+  if (!isWellFormedId(tenant)) return c.json({ error: "tenant required" }, 400);
+  return c.json({ entries: await listAccessLog(tenant as TenantId, c.env) });
 });

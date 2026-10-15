@@ -51,7 +51,11 @@ async function waitForHealth(url: string, child: ChildProcess, timeoutMs: number
  * Builds the SPA, applies D1 migrations to a throwaway local state dir, and starts
  * `wrangler dev` with test hooks enabled behind a random per-run secret.
  */
-export async function startLocalWorker(repoRoot: string, log: string[]): Promise<LocalWorker> {
+export async function startLocalWorker(
+  repoRoot: string,
+  log: string[],
+  extraVars: Readonly<Record<string, string>> = {},
+): Promise<LocalWorker> {
   const apiDir = join(repoRoot, "workers/api");
   const wrangler = join(apiDir, "node_modules/.bin/wrangler");
   const state = mkdtempSync(join(tmpdir(), "verify-app-state-"));
@@ -75,6 +79,7 @@ export async function startLocalWorker(repoRoot: string, log: string[]): Promise
       "TEST_HOOKS:enabled",
       "--var",
       `TEST_HOOKS_SECRET:${secret}`,
+      ...Object.entries(extraVars).flatMap(([k, v]) => ["--var", `${k}:${v}`]),
     ],
     { cwd: apiDir, env, detached: true, stdio: ["ignore", "pipe", "pipe"] },
   );

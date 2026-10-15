@@ -66,6 +66,9 @@ importers:
       '@inkly/domain':
         specifier: workspace:*
         version: link:../domain
+      '@inkly/storage':
+        specifier: workspace:*
+        version: link:../storage
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 5.20261015.1
