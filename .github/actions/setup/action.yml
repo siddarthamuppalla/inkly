@@ -2,7 +2,7 @@ name: setup
 description: Node, pnpm, workspace install, and optional PDF tools and Chromium
 inputs:
   pdf-tools:
-    description: Install qpdf and poppler-utils
+    description: Install qpdf, poppler-utils and ghostscript
     default: "false"
   chromium:
     description: Install Playwright Chromium
@@ -15,7 +15,7 @@ runs:
       with: { node-version-file: .nvmrc, cache: pnpm }
     - if: inputs.pdf-tools == 'true'
       shell: bash
-      run: sudo apt-get update && sudo apt-get install -y qpdf poppler-utils
+      run: sudo apt-get update && sudo apt-get install -y qpdf poppler-utils ghostscript
     - shell: bash
       run: pnpm i --frozen-lockfile
     - if: inputs.chromium == 'true'

@@ -5,7 +5,7 @@ import {
   type Plan,
   type TenantId,
 } from "@inkly/domain";
-import { inspectPdf } from "@inkly/pdf";
+import { inspect } from "@inkly/pdf";
 import { getTenant, getUsage } from "@inkly/storage";
 
 import type { Env } from "./env.ts";
@@ -60,6 +60,10 @@ export async function receivePdf(
 ): Promise<{ body: Uint8Array; sha256: string; pages: number }> {
   const body = await readBody(req, await tenantPlan(tenantId, env));
   await assertStorageFor(tenantId, env, body.byteLength);
-  const { pages } = await inspectPdf(body);
+  if (!String.fromCharCode(...body.subarray(0, 1024)).includes("%PDF-")) {
+    throw new AppError("invalid_input", "The file is not a PDF");
+  }
+  const { pages, encrypted } = await inspect(body);
+  if (encrypted) throw new AppError("pdf_encrypted", "The PDF is password-protected or encrypted");
   return { body, sha256: await sha256Hex(body), pages };
 }

@@ -1,5 +1,6 @@
 node_modules/
 dist/
+coverage/
 build/
 .turbo/
 *.tsbuildinfo
@@ -11,3 +12,5 @@ apps/web/src/__lint_fixture__*
 packages/*/src/__lint_fixture__*
 workers/*/src/__lint_fixture__*
 workers/api/wrangler.preview.json
+workers/api/wrangler.production.json
+.claude/worktrees/

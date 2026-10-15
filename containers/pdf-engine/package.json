@@ -1,0 +1,13 @@
+{
+  "name": "@inkly/pdf-engine",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.ts",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@inkly/testing": "workspace:*",
+    "@types/node": "22.20.5"
+  }
+}

@@ -58,6 +58,11 @@ _Avoid_: quota, credits
 
 **pdf-engine**: Container service for heavy PDF ops.
 
+**Worker ceiling**: The largest input a Page op runs on inside a Worker (25 MB or 200 pages, `MAX_WORKER_BYTES`/`MAX_WORKER_PAGES` in `packages/pdf`); larger inputs go to pdf-engine.
+
+**Page number**: A 1-based page position (`PageNumber` in `packages/pdf`); the first page is 1.
+_Avoid_: page index (for 1-based values)
+
 ## Factory
 
 **Preview environment**: An isolated per-PR deployment (`inkly-pr-<n>`) with its own Worker, D1, R2 and KV; destroyed when the PR closes.
