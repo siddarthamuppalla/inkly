@@ -13,7 +13,7 @@ All are jobs in `.github/workflows/ci.yml`:
 | Check | What it gates |
 |-------|---------------|
 | `check` | `pnpm check` (tsc, eslint with boundaries, prettier) and `pnpm lint:fixtures` |
-| `test` | `pnpm test` (vitest, Workers pool) |
+| `test` | `pnpm test` (vitest, Workers pool, and the pdf-engine service tests with qpdf + Ghostscript) |
 | `verify-pdf` | `verify-pdf --corpus fixtures/pdfs` |
 | `verify-app` | `verify-app --self-test` and `J-000` smoke |
 | `verify-tenancy` | `verify-tenancy` and `--self-test` |
@@ -22,7 +22,9 @@ All are jobs in `.github/workflows/ci.yml`:
 | `secrets` | gitleaks |
 
 `preview` is deliberately not required: it skips when the Cloudflare secrets are
-absent, and fork PRs never get it.
+absent, and fork PRs never get it. `verifier` (T1.7) is not required either: it
+skips on drafts and until `CLAUDE_CODE_OAUTH_TOKEN` is set, and it stops while any
+open issue carries `factory-pause` or the repo variable `FACTORY_PAUSED` is `true`.
 
 ## Apply it
 With the GitHub CLI signed in as a repo admin:
