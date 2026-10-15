@@ -63,6 +63,10 @@ _Avoid_: quota, credits
 **Preview environment**: An isolated per-PR deployment (`inkly-pr-<n>`) with its own Worker, D1, R2 and KV; destroyed when the PR closes.
 _Avoid_: staging
 
+**Test hooks**: The `/__test/*` routes (seed tenant/users, read Outbox) that exist only in dev and Preview environments.
+
+**Outbox**: Captured outgoing email in dev/test/preview instead of real delivery; read by verification skills.
+
 **Paved road**: The single sanctioned way to do a concern in the codebase.
 
 **Verification Evidence**: Required PR block proving acceptance criteria hold.
