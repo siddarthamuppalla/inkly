@@ -1,9 +1,7 @@
-import { authenticate, mintDocumentId, resolveTenant, type Session } from "@inkly/auth";
-import type { DocumentId, TenantId } from "@inkly/domain";
+import { mintDocumentId } from "@inkly/auth";
+import type { DocumentId } from "@inkly/domain";
 import { isWellFormedId } from "@inkly/domain";
-import { accessDenied, logEvent, type AccessAction } from "@inkly/domain/log";
 import {
-  appendAccessLog,
   createStubDoc,
   getStubDoc,
   getStubDocContent,
@@ -13,52 +11,13 @@ import {
 import { Hono } from "hono";
 
 import type { Env } from "./env.ts";
+import { denyAccess as deny, requireTenant, type TenantVars } from "./tenant-context.ts";
 
 // T0.9 stub endpoints: tenant-scoped docs that exist only for verify-tenancy to attack.
 
-type Vars = { session: Session; tenantId: TenantId };
+export const stubDocs = new Hono<{ Bindings: Env; Variables: TenantVars }>();
 
-export const stubDocs = new Hono<{ Bindings: Env; Variables: Vars }>();
-
-async function deny(
-  c: { env: Env; get: (key: "session") => Session },
-  action: AccessAction,
-  resource: string,
-  status: 403 | 404,
-): Promise<Response> {
-  const session = c.get("session");
-  const entry = accessDenied({
-    actorTenantId: session.tenantId,
-    actorUserId: session.userId,
-    action,
-    resource,
-    status,
-  });
-  logEvent(entry);
-  await appendAccessLog(session.tenantId, c.env, entry);
-  return Response.json({ error: status === 403 ? "forbidden" : "not found" }, { status });
-}
-
-stubDocs.use("*", async (c, next) => {
-  const session = await authenticate(c.req.header("authorization"), c.env);
-  if (!session) return c.json({ error: "unauthenticated" }, 401);
-  c.set("session", session);
-  const requested = c.req.header("x-inkly-tenant") ?? c.req.query("tenant");
-  const resolved = resolveTenant(session, requested, c.env);
-  if (!resolved.ok) {
-    const action: AccessAction =
-      c.req.method !== "GET"
-        ? "write"
-        : c.req.path.endsWith("/content")
-          ? "read-content"
-          : /\/stub-docs\/?$/.test(c.req.path)
-            ? "list"
-            : "read";
-    return deny(c, action, `${c.req.method} ${c.req.path}`, 403);
-  }
-  c.set("tenantId", resolved.tenantId);
-  await next();
-});
+stubDocs.use("*", requireTenant);
 
 function docId(raw: string): DocumentId | null {
   return isWellFormedId(raw) ? (raw as DocumentId) : null;
