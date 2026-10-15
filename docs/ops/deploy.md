@@ -14,7 +14,11 @@ the GitHub `production` environment.
    the new code, so every migration must work with the code that is already live.
 4. Creates `BETTER_AUTH_SECRET` once if it is missing, and copies
    `RESEND_API_KEY`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from GitHub
-   secrets when they are set.
+   secrets when they are set. Email settings come from the repository variables
+   `EMAIL_PROVIDER` and `EMAIL_FROM`. When `RESEND_API_KEY` is set and those
+   variables are not, sign-in email goes through Resend from its shared test
+   sender. That sender only delivers to the Resend account owner's own address,
+   until a domain is verified and `EMAIL_FROM` is changed.
 5. Waits for ten healthy `/health` responses in a row, then checks that
    `POST /__test/seed` returns 404.
 

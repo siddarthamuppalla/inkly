@@ -27,6 +27,8 @@ jobs:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      EMAIL_PROVIDER: ${{ vars.EMAIL_PROVIDER }}
+      EMAIL_FROM: ${{ vars.EMAIL_FROM }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
