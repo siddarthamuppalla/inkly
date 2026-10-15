@@ -19,6 +19,13 @@ _Avoid_: account
 
 **Region**: Where a Tenant's data is stored; only `default` exists until EU residency is built.
 
+**Plan**: The billing tier of a Tenant (`free` or `pro`); it determines Limits.
+
+**Limit**: A per-Plan cap (members, storage, file size, page ops, envelopes) enforced server-side.
+
+**Usage**: A Tenant's metered consumption per billing period, checked against its Limits.
+_Avoid_: quota, credits
+
 ## Documents
 
 **Document**: A logical file owned by a tenant; has one or more versions.
