@@ -1,12 +1,13 @@
 import { createServer, type Server } from "node:http";
 
-export type FixtureMode = "clean" | "console-error" | "server-error";
+export type FixtureMode = "clean" | "console-error" | "server-error" | "a11y-violation";
 
+const DOC = '<!doctype html><html lang="en">';
 const PAGES: Record<FixtureMode, string> = {
-  clean: "<!doctype html><title>clean</title><p>ok</p>",
-  "console-error":
-    "<!doctype html><title>console</title><script>console.error('fixture console error')</script>",
-  "server-error": "<!doctype html><title>5xx</title><script>fetch('/boom')</script>",
+  clean: `${DOC}<title>clean</title><p>ok</p>`,
+  "console-error": `${DOC}<title>console</title><script>console.error('fixture console error')</script>`,
+  "server-error": `${DOC}<title>5xx</title><script>fetch('/boom')</script>`,
+  "a11y-violation": `${DOC}<title>a11y</title><p style="color:#c8c8c8;background:#fff">faint text</p><button></button>`,
 };
 
 /** A tiny HTTP server serving one J-FAIL fixture page, used only by `--self-test`. */

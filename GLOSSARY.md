@@ -77,4 +77,10 @@ _Avoid_: staging
 
 **Builder / Verifier**: Agent that writes the change / separate agent that judges it.
 
+**Design token**: A named color or size in `apps/web/src/styles/tokens.css`; components use tokens, never raw colors.
+
+**Seal**: The single red accent color, reserved for signing, required fields and danger.
+
+**Checkpoint**: A point in a verify-app journey that screenshots the page in light and dark and runs an axe WCAG 2.1 AA scan of each.
+
 **Fix-layer ladder**: Architecture → static → tests → skills → human review.

@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react";
 
+import { cn } from "../lib/cn.ts";
+
 type Health = "checking" | "ok" | "degraded";
 
-export function App() {
+const DOT: Record<Health, string> = {
+  checking: "bg-muted-foreground",
+  ok: "bg-success",
+  degraded: "bg-destructive",
+};
+
+export function HealthStatus() {
   const [health, setHealth] = useState<Health>("checking");
 
   useEffect(() => {
@@ -20,9 +28,13 @@ export function App() {
   }, []);
 
   return (
-    <main data-testid="app-shell">
-      <h1>Inkly</h1>
-      <p data-testid="api-health">API: {health}</p>
-    </main>
+    <p
+      data-testid="api-health"
+      role="status"
+      className="flex items-center gap-2 text-muted-foreground"
+    >
+      <span aria-hidden="true" className={cn("size-2 rounded-full", DOT[health])} />
+      API: {health}
+    </p>
   );
 }

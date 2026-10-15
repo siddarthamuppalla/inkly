@@ -10,6 +10,7 @@ document SaaS. Read `docs/factory/` (copies of the kickoff pack) before non-triv
   [0004 tenant isolation](docs/adr/0004-tenant-isolation.md)
 - Grilling log: `docs/decisions/T0.1-grilling-log.md` · Tickets: `docs/tickets/`
 - Vocabulary: [`GLOSSARY.md`](GLOSSARY.md) — use its terms; add new ones.
+- Design system: [`docs/design/README.md`](docs/design/README.md) — colors only from `apps/web/src/styles/tokens.css`.
 
 ## Rule zero
 Not done until verified. Every PR includes a Verification Evidence block.

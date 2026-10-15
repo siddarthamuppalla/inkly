@@ -3,8 +3,9 @@ import boundaries from "eslint-plugin-boundaries";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 import noDirectBindings from "./tools/eslint-rules/no-direct-bindings.mjs";
+import noRawColors from "./tools/eslint-rules/no-raw-colors.mjs";
 
-const inkly = { rules: { "no-direct-bindings": noDirectBindings } };
+const inkly = { rules: { "no-direct-bindings": noDirectBindings, "no-raw-colors": noRawColors } };
 
 export default tseslint.config(
   {
@@ -68,6 +69,11 @@ export default tseslint.config(
       ],
       "inkly/no-direct-bindings": "error",
     },
+  },
+  {
+    files: ["apps/web/src/**/*.{ts,tsx}"],
+    plugins: { inkly },
+    rules: { "inkly/no-raw-colors": "error" },
   },
   {
     files: ["packages/storage/**/*.ts"],

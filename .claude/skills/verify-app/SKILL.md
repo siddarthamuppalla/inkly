@@ -14,7 +14,7 @@ journey, and `summary.md`. Paste the summary path into the PR's Verification Evi
 - When adding a feature: add its row to `feature-map.md` and its automation to
   `packages/testing/src/app/journeys.ts` under the same ID, then run it.
 - After changing this skill: run `--self-test`.
-- CI runs `--self-test` and `J-000` on every PR.
+- CI runs `--self-test`, `J-000` and `J-001` on every PR.
 
 ## Usage
 ```
@@ -29,7 +29,7 @@ journey, and `summary.md`. Paste the summary path into the PR's Verification Evi
 | `--url URL` | Target this URL instead of starting `wrangler dev`. |
 | `--secret S` | Test-hooks secret for the target, used to seed. Defaults to `$TEST_HOOKS_SECRET`. Without it, seeding is skipped and noted in the summary. |
 | `--out DIR` | Artifact root. Default `artifacts/verify-app/`. |
-| `--self-test` | Runs the fixture journey `J-FAIL` against a built-in page three times: clean (must pass), console error (must fail) and 5xx (must fail). Exits 0 only if all three behave. |
+| `--self-test` | Runs the fixture journey `J-FAIL` against a built-in page four times: clean (must pass), console error, 5xx and an accessibility violation (each must fail for that reason). Exits 0 only if all four behave. |
 | `-h`, `--help` | Print usage. |
 
 Without `--url`, it builds `apps/web`, applies D1 migrations to a throwaway state
@@ -41,8 +41,10 @@ Every run:
 2. seeds a fresh tenant and user through `/__test/seed` when it has the secret;
 3. runs each journey in a fresh browser context.
 
-A journey fails on a failed expectation, on any console error or uncaught page
-error, and on any 5xx response. Failed requests (for example aborted ones) are
+Each `checkpoint(name)` in a journey screenshots the page in the light and dark color
+schemes and runs axe-core against WCAG 2.0/2.1/2.2 A and AA rules in each. A journey fails on
+a failed expectation, on any console error or uncaught page error, on any 5xx response,
+and on any axe violation. Failed requests (for example aborted ones) are
 recorded in the summary but do not fail the run.
 
 Exit codes: `0` pass, `1` a journey or check failed, `2` bad arguments or an unknown ID.

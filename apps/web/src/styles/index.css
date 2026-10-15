@@ -1,0 +1,118 @@
+@import "tailwindcss";
+@import "@fontsource-variable/fraunces/opsz.css";
+@import "@fontsource-variable/atkinson-hyperlegible-next/wght.css";
+@import "./tokens.css";
+
+/*
+ * Tailwind's stock palette is switched off: only token colors exist, so
+ * `bg-blue-500` generates nothing and every color traces back to tokens.css.
+ */
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
+  --font-sans: "Atkinson Hyperlegible Next Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --shadow-*: initial;
+}
+
+@theme inline {
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-seal: var(--seal);
+  --color-seal-foreground: var(--seal-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-link: var(--link);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-rule: var(--rule);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+
+  /* Elevation: a hard ink stamp for actions, a soft lift for paper. */
+  --shadow-stamp: 3px 3px 0 0 var(--seal);
+  --shadow-stamp-lift: 4px 4px 0 0 var(--seal);
+  --shadow-stamp-ink: 3px 3px 0 0 var(--foreground);
+  --shadow-sheet: 0 1px 0 0 var(--border), 0 12px 24px -18px var(--shadow-color);
+  --shadow-margin: inset 2px 0 0 0 var(--seal);
+
+  --default-transition-duration: var(--duration-fast);
+  --default-transition-timing-function: var(--ease-ink);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    font-size: 100%;
+    line-height: 1.55;
+    background: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  * {
+    border-color: var(--border);
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-weight: 560;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  a {
+    color: var(--link);
+    text-underline-offset: 0.2em;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The legal-pad margin: a thin seal-red rule down the left of the page body. */
+@utility margin-rule {
+  background-image: linear-gradient(var(--rule), var(--rule));
+  background-size: 2px 100%;
+  background-repeat: no-repeat;
+  background-position: left top;
+}

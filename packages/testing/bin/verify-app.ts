@@ -113,10 +113,11 @@ async function selfTest(out: string) {
   const jfail = JOURNEYS.get("J-FAIL");
   if (!jfail) throw new Error("J-FAIL journey missing");
   const runId = `${newRunId()}-self-test`;
-  const cases: { mode: FixtureMode; expect: "pass" | "console" | "5xx" }[] = [
+  const cases: { mode: FixtureMode; expect: "pass" | "console" | "5xx" | "a11y" }[] = [
     { mode: "clean", expect: "pass" },
     { mode: "console-error", expect: "console" },
     { mode: "server-error", expect: "5xx" },
+    { mode: "a11y-violation", expect: "a11y" },
   ];
   let ok = true;
   for (const c of cases) {
@@ -132,7 +133,9 @@ async function selfTest(out: string) {
           ? "console"
           : r.serverErrors.length > 0
             ? "5xx"
-            : "other";
+            : r.a11yViolations.length > 0
+              ? "a11y"
+              : "other";
       const good = got === c.expect;
       ok &&= good;
       console.log(
