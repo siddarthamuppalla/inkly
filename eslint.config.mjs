@@ -72,4 +72,9 @@ export default tseslint.config(
     files: ["packages/storage/**/*.ts"],
     rules: { "inkly/no-direct-bindings": "off" },
   },
+  {
+    // Test-runtime bootstrap: applies D1 migrations before any test, outside any tenant.
+    files: ["workers/*/test/apply-migrations.ts"],
+    rules: { "inkly/no-direct-bindings": "off" },
+  },
 );

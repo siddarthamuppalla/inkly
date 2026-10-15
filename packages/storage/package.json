@@ -3,6 +3,16 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./health": "./src/health.ts"
+  },
+  "dependencies": {
+    "@inkly/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261015.1"
+  },
+  "scripts": {
+    "test": "vitest run"
   }
 }

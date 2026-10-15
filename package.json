@@ -10,8 +10,9 @@
     "build": "turbo run build",
     "check": "tsc -b && eslint . --max-warnings 0 && prettier --check .",
     "lint:fixtures": "node tools/lint-fixtures/run.mjs",
-    "test": "vitest run --passWithNoTests",
-    "format": "prettier --write ."
+    "test": "pnpm -r --if-present test",
+    "format": "prettier --write .",
+    "dev": "pnpm --filter @inkly/api dev"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
