@@ -1,7 +1,4 @@
-import { issueSession, mintTenantId, mintUserId } from "@inkly/auth";
-import type { TenantId } from "@inkly/domain";
-import { isWellFormedId } from "@inkly/domain";
-import { createTenant, createUser, listAccessLog } from "@inkly/storage";
+import { readAccessLog, readOutbox, seedAccount, testHooksOn } from "@inkly/auth";
 import { Hono } from "hono";
 
 import type { Env } from "./env.ts";
@@ -21,7 +18,7 @@ function secretMatches(given: string | undefined, expected: string): boolean {
 
 export function testHooksEnabled(env: Env, header: string | undefined): boolean {
   const secret = env.TEST_HOOKS_SECRET ?? "";
-  return env.TEST_HOOKS === "enabled" && secret.length > 0 && secretMatches(header, secret);
+  return testHooksOn(env) && secret.length > 0 && secretMatches(header, secret);
 }
 
 export const testHooks = new Hono<{ Bindings: Env }>();
@@ -31,19 +28,29 @@ testHooks.use("*", async (c, next) => {
   await next();
 });
 
+/**
+ * Body (all optional): `{ email, name, plan: "free" | "pro" }`. Signs up a User through
+ * packages/auth, so they own a fresh workspace, and returns a bearer token.
+ */
 testHooks.post("/seed", async (c) => {
-  const tenantId = mintTenantId();
-  const userId = mintUserId();
-  const email = `${userId}@seed.inkly.test`;
-  await createTenant(tenantId, c.env, `Seed ${tenantId}`);
-  await createUser(tenantId, c.env, { id: userId, email });
-  const token = await issueSession(tenantId, userId, c.env);
-  return c.json({ tenantId, userId, email, token }, 201);
+  const body: unknown = await c.req.json().catch(() => ({}));
+  const input = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
+  const id = crypto.randomUUID().slice(0, 12);
+  const email = typeof input["email"] === "string" ? input["email"] : `seed-${id}@seed.inkly.test`;
+  const name = typeof input["name"] === "string" ? input["name"] : `Seed ${id}`;
+  const plan = input["plan"] === "pro" ? "pro" : undefined;
+  return c.json(await seedAccount(c.req.raw, c.env, { email, name, ...(plan && { plan }) }), 201);
 });
 
 // Lets verify-tenancy count the access-log entries its denied attempts produced.
 testHooks.get("/access-log", async (c) => {
-  const tenant = c.req.query("tenant") ?? "";
-  if (!isWellFormedId(tenant)) return c.json({ error: "tenant required" }, 400);
-  return c.json({ entries: await listAccessLog(tenant as TenantId, c.env) });
+  const entries = await readAccessLog(c.env, c.req.query("tenant") ?? "");
+  return entries ? c.json({ entries }) : c.json({ error: "tenant required" }, 400);
+});
+
+// Captured email for one address, newest first (Outbox, Q5).
+testHooks.get("/outbox", async (c) => {
+  const to = c.req.query("to") ?? "";
+  if (!to.includes("@")) return c.json({ error: "to required" }, 400);
+  return c.json({ messages: await readOutbox(c.env, to) });
 });

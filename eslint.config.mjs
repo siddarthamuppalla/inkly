@@ -5,8 +5,15 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 import noDirectBindings from "./tools/eslint-rules/no-direct-bindings.mjs";
 import noRawColors from "./tools/eslint-rules/no-raw-colors.mjs";
+import noTenantIdMint from "./tools/eslint-rules/no-tenant-id-mint.mjs";
 
-const inkly = { rules: { "no-direct-bindings": noDirectBindings, "no-raw-colors": noRawColors } };
+const inkly = {
+  rules: {
+    "no-direct-bindings": noDirectBindings,
+    "no-raw-colors": noRawColors,
+    "no-tenant-id-mint": noTenantIdMint,
+  },
+};
 
 export default tseslint.config(
   {
@@ -73,7 +80,30 @@ export default tseslint.config(
         },
       ],
       "inkly/no-direct-bindings": "error",
+      "inkly/no-tenant-id-mint": "error",
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@inkly/storage/auth",
+              message:
+                "Only packages/auth may use @inkly/storage/auth (auth tables, Outbox, KV counters). Call a packages/auth function instead.",
+            },
+          ],
+        },
+      ],
     },
+  },
+  {
+    // ADR-0004: packages/auth is where TenantIds are minted and auth storage is used.
+    files: ["packages/auth/**/*.ts", "packages/storage/**/*.ts"],
+    rules: { "inkly/no-tenant-id-mint": "off", "no-restricted-imports": "off" },
+  },
+  {
+    // Tests build fake TenantIds to exercise storage directly.
+    files: ["**/test/**/*.ts"],
+    rules: { "inkly/no-tenant-id-mint": "off" },
   },
   {
     files: ["apps/web/src/**/*.{ts,tsx}"],

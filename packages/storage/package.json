@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./auth": "./src/auth.ts",
     "./health": "./src/health.ts"
   },
   "dependencies": {

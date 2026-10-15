@@ -15,6 +15,8 @@ export interface JourneyResult {
   readonly serverErrors: readonly string[];
   readonly a11yViolations: readonly string[];
   readonly failedRequests: readonly string[];
+  /** 4xx responses the journey declared as designed outcomes; reported, never failed on. */
+  readonly expectedClientErrors: readonly string[];
   readonly artifacts: readonly string[];
 }
 
@@ -43,10 +45,21 @@ function launchOptions(): LaunchOptions {
   return executablePath ? { executablePath } : {};
 }
 
+const RESOURCE_STATUS = /^Failed to load resource: the server responded with a status of (4\d\d)\b/;
+
+/** Chromium logs every 4xx as a console error; a journey may declare the ones it expects. */
+function isExpectedClientError(journey: Journey, text: string, url: string): boolean {
+  const status = Number(RESOURCE_STATUS.exec(text)?.[1]);
+  if (!status) return false;
+  const path = URL.canParse(url) ? new URL(url).pathname : "";
+  return (journey.expectedClientErrors ?? []).some((e) => e.status === status && e.path === path);
+}
+
 export async function runJourneys(
   journeys: readonly Journey[],
   baseUrl: string,
   outDir: string,
+  secret?: string,
 ): Promise<JourneyResult[]> {
   mkdirSync(outDir, { recursive: true });
   const browser = await chromium.launch(launchOptions());
@@ -58,12 +71,18 @@ export async function runJourneys(
       const serverErrors: string[] = [];
       const a11yViolations: string[] = [];
       const failedRequests: string[] = [];
+      const expectedClientErrors: string[] = [];
       const artifacts: string[] = [];
       const context = await browser.newContext();
       await context.tracing.start({ screenshots: true, snapshots: true });
       const page = await context.newPage();
       page.on("console", (m) => {
-        if (m.type() === "error") consoleErrors.push(m.text());
+        if (m.type() !== "error") return;
+        if (isExpectedClientError(journey, m.text(), m.location().url)) {
+          expectedClientErrors.push(`${m.text()} (${m.location().url})`);
+          return;
+        }
+        consoleErrors.push(m.text());
       });
       page.on("pageerror", (e) => consoleErrors.push(`uncaught: ${e.message}`));
       context.on("response", (r) => {
@@ -78,6 +97,7 @@ export async function runJourneys(
         await journey.run({
           page,
           baseUrl,
+          secret,
           expect: (cond, msg) => {
             if (!cond) failures.push(msg);
           },
@@ -116,6 +136,7 @@ export async function runJourneys(
         serverErrors,
         a11yViolations,
         failedRequests,
+        expectedClientErrors,
         artifacts,
       });
     }
@@ -150,6 +171,7 @@ export function writeSummary(info: RunInfo, results: readonly JourneyResult[]): 
       ...r.serverErrors.map((e) => `- 5xx: ${e}`),
       ...r.a11yViolations.map((e) => `- a11y: ${e}`),
       ...r.failedRequests.map((e) => `- request failed: ${e}`),
+      ...r.expectedClientErrors.map((e) => `- expected 4xx: ${e}`),
     ];
     if (details.length > 0) lines.push("", `## ${r.id}`, "", ...details);
   }

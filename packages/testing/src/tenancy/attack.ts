@@ -1,4 +1,4 @@
-// verify-tenancy: as tenant A, try to reach tenant B's stub doc every way we know.
+// verify-tenancy: as tenant A, try to reach tenant B's stub doc and workspace every way we know.
 // Every attempt must be refused (403/404) and leave an access-log entry.
 
 export interface Attempt {
@@ -112,6 +112,27 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
       path: `/v0/stub-docs/${docB}/content`,
       init: { headers: asB },
     },
+    {
+      name: "switch Active tenant to B",
+      method: "POST",
+      path: "/api/me/active-tenant",
+      init: { headers: json, body: JSON.stringify({ tenantId: b.tenantId }) },
+    },
+    {
+      name: "list B's members claiming B's tenant",
+      method: "GET",
+      path: "/api/tenant/members",
+      init: { headers: asB },
+    },
+    {
+      name: "invite into B claiming B's tenant",
+      method: "POST",
+      path: "/api/tenant/invitations",
+      init: {
+        headers: { ...json, ...asB },
+        body: JSON.stringify({ email: "intruder@seed.inkly.test", role: "admin" }),
+      },
+    },
   ];
 
   const attempts: Attempt[] = [];
@@ -125,6 +146,19 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
       status: res.status,
       denied: res.status === 403 || res.status === 404,
     });
+  }
+
+  const me = (await (await call(baseUrl, a, "GET", "/api/me")).json()) as {
+    activeTenant?: { id?: string } | null;
+  };
+  if (me.activeTenant?.id !== a.tenantId) {
+    problems.push(`A's Active tenant is ${String(me.activeTenant?.id)} after the switch attempt`);
+  }
+  const listAfter = (await (await call(baseUrl, a, "GET", "/v0/stub-docs")).json()) as {
+    docs?: { id: string }[];
+  };
+  if ((listAfter.docs ?? []).some((d) => d.id === docB)) {
+    problems.push("A's list includes B's doc after the switch attempt");
   }
 
   const after = await call(baseUrl, b, "GET", `/v0/stub-docs/${docB}`);

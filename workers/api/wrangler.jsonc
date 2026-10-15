@@ -3,6 +3,8 @@
   "name": "inkly-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
+  // Better-Auth needs AsyncLocalStorage (node:async_hooks).
+  "compatibility_flags": ["nodejs_compat"],
   // ADR-0002: the SPA in apps/web is served as static assets by this Worker.
   "assets": {
     "directory": "../../apps/web/dist",

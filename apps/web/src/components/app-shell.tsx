@@ -2,19 +2,23 @@ import { useEffect, useRef } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
 
 import { cn } from "../lib/cn.ts";
+import { useMe } from "../lib/session.ts";
 import { Wordmark } from "./brand/wordmark.tsx";
 import { HealthStatus } from "./health-status.tsx";
+import { UserMenu } from "./user-menu.tsx";
 
 const NAV = [
   { to: "/", label: "Documents" },
   { to: "/envelopes", label: "Envelopes" },
   { to: "/links", label: "Share links" },
+  { to: "/members", label: "Members" },
 ] as const;
 
 export function AppShell() {
   const main = useRef<HTMLElement>(null);
   const { pathname } = useLocation();
   const firstRender = useRef(true);
+  const me = useMe();
 
   // After client-side navigation, move focus to the new page so screen readers announce it.
   useEffect(() => {
@@ -57,6 +61,7 @@ export function AppShell() {
             ))}
           </ul>
         </nav>
+        {me && <UserMenu me={me} />}
         <div className="mt-auto hidden flex-col gap-3 text-sm md:flex">
           <NavLink to="/design" className="-mx-1 block px-1 py-1 text-muted-foreground">
             Design system

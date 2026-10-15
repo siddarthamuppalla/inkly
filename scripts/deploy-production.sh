@@ -6,7 +6,9 @@
 #                                    migrate, deploy, smoke-test, print the URL
 #
 # Needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. Optional secrets copied into the
-# Worker when set: RESEND_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET.
+# Worker when set: RESEND_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, EMAIL_PROVIDER,
+# EMAIL_FROM. With RESEND_API_KEY and no EMAIL_PROVIDER, sign-in mail goes through Resend
+# from its shared test sender, which only delivers to the Resend account's own address.
 set -euo pipefail
 
 # shellcheck source=../.claude/skills/cf-deploy-preview/cf-lib.sh
@@ -23,7 +25,13 @@ pnpm --dir "$root" --filter @inkly/web build >/dev/null
 (cd "$api_dir" && "$wrangler" deploy -c "$config")
 
 ensure_random_secret "$config" BETTER_AUTH_SECRET
-for s in RESEND_API_KEY GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET; do put_secret_if_set "$config" "$s"; done
+if [ -n "${RESEND_API_KEY:-}" ]; then
+  EMAIL_PROVIDER="${EMAIL_PROVIDER:-resend}"
+  EMAIL_FROM="${EMAIL_FROM:-Inkly <onboarding@resend.dev>}"
+fi
+for s in RESEND_API_KEY GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET EMAIL_PROVIDER EMAIL_FROM; do
+  put_secret_if_set "$config" "$s"
+done
 
 url="$(workers_dev_url "$name")"
 wait_healthy "$url"

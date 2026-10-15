@@ -49,7 +49,8 @@ async function waitForHealth(url: string, child: ChildProcess, timeoutMs: number
 
 /**
  * Builds the SPA, applies D1 migrations to a throwaway local state dir, and starts
- * `wrangler dev` with test hooks enabled behind a random per-run secret.
+ * `wrangler dev` with test hooks enabled behind a random per-run secret, a random
+ * Better-Auth secret and mail captured in the Outbox.
  */
 export async function startLocalWorker(
   repoRoot: string,
@@ -79,6 +80,10 @@ export async function startLocalWorker(
       "TEST_HOOKS:enabled",
       "--var",
       `TEST_HOOKS_SECRET:${secret}`,
+      "--var",
+      `BETTER_AUTH_SECRET:${randomBytes(32).toString("hex")}`,
+      "--var",
+      "EMAIL_PROVIDER:outbox",
       ...Object.entries(extraVars).flatMap(([k, v]) => ["--var", `${k}:${v}`]),
     ],
     { cwd: apiDir, env, detached: true, stdio: ["ignore", "pipe", "pipe"] },
