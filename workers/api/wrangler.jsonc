@@ -3,6 +3,12 @@
   "name": "inkly-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
+  // ADR-0002: the SPA in apps/web is served as static assets by this Worker.
+  "assets": {
+    "directory": "../../apps/web/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/health", "/__test/*", "/api/*"],
+  },
   "d1_databases": [
     {
       "binding": "DB",

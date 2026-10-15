@@ -163,7 +163,7 @@ pnpm --filter @inkly/testing test      # pixelmatch pass/fail tests
 ```
 .claude/skills/verify-app/run.sh J-000                 # exits 0, prints artifact path
 .claude/skills/verify-app/run.sh --self-test           # J-FAIL fails as expected → exits 0
-pnpm test --filter @inkly/api -- test-hooks            # 404 without flag/secret
+pnpm --filter @inkly/api test test-hooks              # 404 without flag/secret
 ```
 **Out of scope:** real user journeys (each feature PR adds rows).
 **Dependencies:** T0.5.
