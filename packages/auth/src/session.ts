@@ -37,12 +37,9 @@ export async function issueSession(
   return token;
 }
 
-/** The caller's session from `Authorization: Bearer <token>`, or null. */
-export async function authenticate(
-  authorization: string | undefined,
-  env: AuthEnv,
-): Promise<Session | null> {
-  const token = /^Bearer ([0-9a-f]{64})$/.exec(authorization ?? "")?.[1];
+/** The caller's session from the request headers (`Authorization: Bearer <token>`), or null. */
+export async function authenticate(headers: Headers, env: AuthEnv): Promise<Session | null> {
+  const token = /^Bearer ([0-9a-f]{64})$/.exec(headers.get("authorization") ?? "")?.[1];
   if (token === undefined) return null;
   const row = await findSession(env, await sha256Hex(token));
   return row ? { tenantId: row.tenantId, userId: row.userId } : null;
