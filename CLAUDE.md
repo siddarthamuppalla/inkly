@@ -17,6 +17,8 @@ Not done until verified. Every PR includes a Verification Evidence block.
 
 ## Agent skills
 
+Cloud sessions install `mattpocock-skills` and `pstack` at project scope via the SessionStart hook `.claude/hooks/session-start.sh` (no-op locally and when already installed).
+
 ### Issue tracker
 
 GitHub Issues in this repo; ticket template and branch naming in `docs/agents/issue-tracker.md`.
