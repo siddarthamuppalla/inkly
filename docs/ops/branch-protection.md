@@ -13,7 +13,7 @@ All are jobs in `.github/workflows/ci.yml`:
 | Check | What it gates |
 |-------|---------------|
 | `check` | `pnpm check` (tsc, eslint with boundaries, prettier) and `pnpm lint:fixtures` |
-| `test` | `pnpm test` (vitest, Workers pool) |
+| `test` | `pnpm test` (vitest, Workers pool, and the pdf-engine service tests with qpdf + Ghostscript) |
 | `verify-pdf` | `verify-pdf --corpus fixtures/pdfs` |
 | `verify-app` | `verify-app --self-test` and `J-000` smoke |
 | `verify-tenancy` | `verify-tenancy` and `--self-test` |

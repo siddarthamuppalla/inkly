@@ -1,3 +1,4 @@
+import { builtinModules } from "node:module";
 import js from "@eslint/js";
 import boundaries from "eslint-plugin-boundaries";
 import globals from "globals";
@@ -46,7 +47,7 @@ export default tseslint.config(
     },
     rules: {
       // CLAUDE.md "Boundaries": apps/web never reaches workers or storage;
-      // packages/domain imports nothing with I/O.
+      // packages/domain imports nothing with I/O; packages/pdf has no I/O either.
       "boundaries/dependencies": [
         "error",
         {
@@ -59,6 +60,10 @@ export default tseslint.config(
             {
               from: { element: { type: "domain" } },
               disallow: { to: { element: { type: "!domain" } } },
+            },
+            {
+              from: { element: { type: "pdf" } },
+              disallow: { to: { element: { types: { anyOf: ["storage", "auth"] } } } },
             },
             {
               from: { element: { type: "!worker" } },
@@ -74,6 +79,23 @@ export default tseslint.config(
     files: ["apps/web/src/**/*.{ts,tsx}"],
     plugins: { inkly },
     rules: { "inkly/no-raw-colors": "error" },
+  },
+  {
+    // packages/pdf runs inside Workers: no Node built-ins (CLAUDE.md paved roads).
+    files: ["packages/pdf/src/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: builtinModules.map((name) => ({
+            name,
+            message: "packages/pdf runs in Workers; Node built-ins are unavailable.",
+          })),
+          patterns: [{ group: ["node:*"], message: "packages/pdf runs in Workers; use Web APIs." }],
+        },
+      ],
+      "no-restricted-globals": ["error", "Buffer", "process", "require", "__dirname"],
+    },
   },
   {
     files: ["packages/storage/**/*.ts"],
