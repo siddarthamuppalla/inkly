@@ -27,7 +27,7 @@ with minimal supervision.
 10. **Billing** — Free / Pro / Team via Stripe with usage limits.
 11. **API & webhooks** — later phase.
 
-## MVP scope (target: [8–12] weeks)
+## MVP scope (target: rapid iteration after a ~1-day Phase 0)
 - Auth, workspaces, tenant isolation
 - Upload / view / download PDFs; folders
 - Merge, split, rotate, reorder, compress
@@ -46,7 +46,7 @@ mobile apps, AES/QES signatures.
 | Performance | Common ops on a 50-page PDF < 3 s p95 |
 | Correctness | All produced PDFs pass `qpdf --check`; signed PDFs validate in pyHanko |
 | Security | Zero cross-tenant access in `verify-tenancy`; every file access authorized and logged |
-| Cost | Infra cost < [$X] per monthly active user |
+| Cost | Infra ≤ $25/mo total pre-launch ($5 Workers Paid + $20 usage) |
 | Quality | ≥ 80% coverage on PDF + signing core; E2E for every feature-map journey |
 | Factory | Rework rate < [20]%, escaped defects trending down, human review time per PR trending down |
 
@@ -55,8 +55,11 @@ mobile apps, AES/QES signatures.
 - Building our own PDF renderer from scratch (use PDF.js / pdf-lib / proven engines).
 - Qualified signatures in v1.
 
-## Open decisions (resolve via grilling in week 1)
-- Product name, frontend framework, auth provider, email provider
-- Pricing tiers and limits
-- Budget per MAU, timeline, team size
-- Data residency requirements (EU?)
+## Decisions (resolved in T0.1 grilling, 2026-10-15)
+See `docs/decisions/T0.1-grilling-log.md` and `docs/adr/`.
+- Product name: Inkly (public brand/domain before beta) · Frontend: React + Vite SPA (ADR-0002) ·
+  Auth: Better-Auth on D1 (ADR-0003) · Email: Cloudflare Email Service, Resend free fallback
+- Pricing: Free / Pro $12 — limits in the log (Q8)
+- Budget: $25/mo total infra pre-launch · Timeline: Phase 0 in ~1 day, then rapid iteration ·
+  Team: one human + ≤3 supervised agents
+- Data residency: none at MVP; `tenants.region` reserved for EU later
