@@ -6,6 +6,15 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@inkly/domain": "workspace:*"
+    "@inkly/domain": "workspace:*",
+    "pixelmatch": "8.0.0",
+    "pngjs": "7.0.0"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/pngjs": "6.0.5"
   }
 }
