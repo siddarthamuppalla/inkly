@@ -22,12 +22,20 @@ interface Seeded {
   token: string;
 }
 
+/** Body and content type of an unexpected response, so a failure says who answered. */
+async function describe(res: Response): Promise<string> {
+  const body = (await res.text()).slice(0, 200);
+  return `${res.headers.get("content-type") ?? "no content-type"} ${JSON.stringify(body)}`;
+}
+
 async function seed(baseUrl: string, secret: string): Promise<Seeded> {
   const res = await fetch(new URL("/__test/seed", baseUrl), {
     method: "POST",
     headers: { "x-test-hooks-secret": secret },
   });
-  if (res.status !== 201) throw new Error(`seed returned ${String(res.status)}, expected 201`);
+  if (res.status !== 201) {
+    throw new Error(`seed returned ${String(res.status)}, expected 201: ${await describe(res)}`);
+  }
   return (await res.json()) as Seeded;
 }
 
@@ -47,7 +55,9 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ title, content: `secret of ${who.tenantId}` }),
     });
-    if (res.status !== 201) throw new Error(`create doc returned ${String(res.status)}`);
+    if (res.status !== 201) {
+      throw new Error(`create doc returned ${String(res.status)}: ${await describe(res)}`);
+    }
     return ((await res.json()) as { id: string }).id;
   };
   const docB = await create(b, "B original");

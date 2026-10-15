@@ -105,13 +105,17 @@ deploy() {
   fi
   url="https://$name.$subdomain.workers.dev"
 
-  local status=""
-  for _ in $(seq 1 30); do
+  # A new workers.dev route reaches Cloudflare's edge unevenly: one 200 can be followed
+  # by a 404 from a machine that hasn't seen the Worker yet (seen on the first deploy of
+  # PR #22). Wait for several 200s in a row before handing the URL to the verifiers.
+  local status="" streak=0
+  for _ in $(seq 1 60); do
     status="$(curl -s -o /dev/null -w '%{http_code}' "$url/health" || true)"
-    [ "$status" = "200" ] && break
+    if [ "$status" = "200" ]; then streak=$((streak + 1)); else streak=0; fi
+    [ "$streak" -ge 5 ] && break
     sleep 2
   done
-  [ "$status" = "200" ] || die "$url/health returned $status after deploy"
+  [ "$streak" -ge 5 ] || die "$url/health not stable after deploy (last status $status)"
   echo "health: $(curl -s "$url/health")"
   echo "pr: $pr"
   echo "url: $url"
