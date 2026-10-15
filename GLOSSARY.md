@@ -17,6 +17,13 @@ _Avoid_: account
 
 **TenantId**: Branded identifier for a Tenant, minted only by `packages/auth` after a membership check; required by every `packages/storage` call.
 
+**Session**: A signed-in User's session row in D1, presented as an HTTP-only cookie or an `Authorization: Bearer` token; it records the Active tenant.
+
+**Sign-in code**: A 6-digit, 10-minute code emailed to sign in or sign up (Better-Auth email OTP). At most 5 code or link requests per email per 10 minutes.
+_Avoid_: password, OTP (in UI copy)
+
+**Invitation**: An emailed offer for one address to become a Member of a Tenant with a role; accepting it takes a seat under the Plan's member Limit (Free 1, Pro 5).
+
 **Region**: Where a Tenant's data is stored; only `default` exists until EU residency is built.
 
 **Plan**: The billing tier of a Tenant (`free` or `pro`); it determines Limits.
@@ -66,6 +73,8 @@ _Avoid_: staging
 **Test hooks**: The `/__test/*` routes (seed tenant/users, read Outbox) that exist only in dev and Preview environments.
 
 **Outbox**: Captured outgoing email in dev/test/preview instead of real delivery; read by verification skills.
+
+**Email sender**: The one `EmailSender` interface in `packages/auth`; `EMAIL_PROVIDER` picks `outbox`, `resend` or `cloudflare` (Cloudflare Email Service).
 
 **Paved road**: The single sanctioned way to do a concern in the codebase.
 
