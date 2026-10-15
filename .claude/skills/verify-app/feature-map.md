@@ -6,5 +6,7 @@ journey's automation in `packages/testing/src/app/journeys.ts` under the same ID
 
 | ID | Journey | Steps | Expected | Spec |
 |----|---------|-------|----------|------|
-| J-000 | Health check | open / → GET /health | 200, all bindings true; SPA shell renders; 0 console errors | #7 |
+| J-000 | Health check | open / → GET /health | 200, all bindings true; SPA renders (app shell, or /sign-in when signed out); 0 console errors | #7 |
 | J-001 | Design system reference | open /design → Tab → Enter | h1 and every section render; title "Design system · Inkly"; first Tab is the skip link with a ≥2px outline; Enter moves focus to #main; no horizontal scroll at 320px; 0 axe violations in light and dark | #23 |
+| J-002 | Sign in with an email code | open / signed out → enter email → read code from the Outbox → enter code → sign out | / redirects to /sign-in; no Google button (unset); lands on / with the user menu; `GET /api/me` shows the email, Active tenant "<name>'s workspace" and role owner; sign-out returns to /sign-in and `/api/me` is 401 | T1.1 |
+| J-008 | Invite a member | seeded Pro owner opens /members → invites an email → invitee opens the Outbox link → Accept → seeded Free owner invites | invitation confirmed and listed; invitee lands on / in the owner's workspace as editor and is listed as a member; a Free workspace shows "The Free plan allows 1 member" | T1.1 |

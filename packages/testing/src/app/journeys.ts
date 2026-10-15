@@ -1,8 +1,10 @@
-import type { Page } from "playwright";
+import type { Locator, Page } from "playwright";
 
 export interface JourneyContext {
   readonly page: Page;
   readonly baseUrl: string;
+  /** Test-hooks secret for the target, when known (local wrangler dev or --secret). */
+  readonly secret: string | undefined;
   /** Records a failed expectation; the journey keeps going so the report is complete. */
   readonly expect: (condition: boolean, message: string) => void;
   /** Screenshots the page in light and dark schemes and runs an axe WCAG 2.1 A/AA scan of each. */
@@ -14,6 +16,11 @@ export interface Journey {
   readonly title: string;
   /** Fixture journeys exist only for `--self-test` and never appear in feature-map.md. */
   readonly selfTestOnly?: boolean;
+  /**
+   * 4xx responses this journey causes on purpose (status and exact path). Chromium logs
+   * them as console errors; listed ones are reported but do not fail the journey.
+   */
+  readonly expectedClientErrors?: readonly { readonly status: number; readonly path: string }[];
   readonly run: (ctx: JourneyContext) => Promise<void>;
 }
 
@@ -27,6 +34,8 @@ interface HealthBody {
 const J000: Journey = {
   id: "J-000",
   title: "Health check",
+  // Signed out, the auth guard's GET /api/me answers 401 and sends the visitor to /sign-in.
+  expectedClientErrors: [{ status: 401, path: "/api/me" }],
   async run({ page, baseUrl, expect, checkpoint }) {
     const res = await page.request.get(new URL("/health", baseUrl).toString());
     expect(res.status() === 200, `GET /health returned ${String(res.status())}, expected 200`);
@@ -35,10 +44,14 @@ const J000: Journey = {
       expect(body[key] === true, `GET /health: ${key} is ${String(body[key])}, expected true`);
     }
 
+    // Signed out, "/" sends the visitor to /sign-in, which is part of the SPA too.
     await page.goto(new URL("/", baseUrl).toString());
-    const shell = page.getByTestId("app-shell");
+    const shell = page.getByTestId("app-shell").or(page.getByTestId("sign-in"));
     await shell.waitFor({ timeout: 10_000 }).catch(() => undefined);
-    expect(await shell.isVisible(), "SPA shell [data-testid=app-shell] did not render");
+    expect(
+      await shell.isVisible(),
+      "SPA did not render [data-testid=app-shell] or [data-testid=sign-in]",
+    );
     const health = page.getByTestId("api-health");
     await health
       .filter({ hasText: "API: ok" })
@@ -120,6 +133,191 @@ const J001: Journey = {
   },
 };
 
+export interface SeededUser {
+  readonly tenantId: string;
+  readonly userId: string;
+  readonly email: string;
+  readonly token: string;
+}
+
+async function seedUser(
+  ctx: JourneyContext,
+  input: { email?: string; plan?: "free" | "pro" } = {},
+): Promise<SeededUser> {
+  if (ctx.secret === undefined) {
+    throw new Error("this journey needs the test-hooks secret (--secret or local wrangler dev)");
+  }
+  const res = await ctx.page.request.post(new URL("/__test/seed", ctx.baseUrl).toString(), {
+    headers: { "x-test-hooks-secret": ctx.secret },
+    data: input,
+  });
+  if (res.status() !== 201) throw new Error(`POST /__test/seed returned ${String(res.status())}`);
+  return (await res.json()) as SeededUser;
+}
+
+/**
+ * Seeds a fresh Tenant and owner through `/__test/seed` and signs the page in as them:
+ * every later request from the page carries `Authorization: Bearer <token>`.
+ */
+export async function signedIn(
+  ctx: JourneyContext,
+  input: { email?: string; plan?: "free" | "pro" } = {},
+): Promise<SeededUser> {
+  const user = await seedUser(ctx, input);
+  await ctx.page.setExtraHTTPHeaders({ authorization: `Bearer ${user.token}` });
+  return user;
+}
+
+/** The newest Outbox email for `to`, read through `/__test/outbox`. */
+async function latestMail(ctx: JourneyContext, to: string): Promise<string> {
+  const url = new URL("/__test/outbox", ctx.baseUrl);
+  url.searchParams.set("to", to);
+  const res = await ctx.page.request.get(url.toString(), {
+    headers: { "x-test-hooks-secret": ctx.secret ?? "" },
+  });
+  const body = (await res.json().catch(() => ({}))) as { messages?: { text: string }[] };
+  return body.messages?.[0]?.text ?? "";
+}
+
+function uniqueEmail(label: string): string {
+  return `${label}-${Math.random().toString(36).slice(2, 10)}@verify.inkly.test`;
+}
+
+interface MeBody {
+  user?: { email?: string };
+  activeTenant?: { id?: string; name?: string } | null;
+  role?: string | null;
+}
+
+/** `GET /api/me` from inside the page, so it carries the page's cookie or bearer header. */
+async function apiMe(ctx: JourneyContext): Promise<{ status: number; body: MeBody }> {
+  return ctx.page.evaluate<{ status: number; body: MeBody }>(
+    "fetch('/api/me').then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})) }))",
+  );
+}
+
+const visible = (l: Locator) =>
+  l
+    .first()
+    .waitFor({ timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+
+const J002: Journey = {
+  id: "J-002",
+  title: "Sign in with an email code",
+  expectedClientErrors: [{ status: 401, path: "/api/me" }],
+  async run(ctx) {
+    const { page, baseUrl, expect, checkpoint } = ctx;
+    await page.goto(new URL("/", baseUrl).toString());
+    expect(
+      await visible(page.getByRole("heading", { level: 1, name: "Sign in to Inkly" })),
+      "signed-out / did not show the sign-in page",
+    );
+    expect(new URL(page.url()).pathname === "/sign-in", `signed-out / landed on ${page.url()}`);
+    expect(
+      (await page.getByRole("button", { name: "Continue with Google" }).count()) === 0,
+      "Google is offered although GOOGLE_CLIENT_ID is unset",
+    );
+    await checkpoint("sign-in");
+
+    const email = uniqueEmail("j002");
+    await page.getByLabel("Email").fill(email);
+    await page.getByRole("button", { name: "Email me a code" }).click();
+    expect(
+      await visible(page.getByRole("heading", { level: 1, name: "Check your email" })),
+      "code step did not appear",
+    );
+    await checkpoint("code");
+
+    const code = /\b(\d{6})\b/.exec(await latestMail(ctx, email))?.[1] ?? "";
+    expect(code !== "", `no sign-in code in the Outbox for ${email}`);
+    await page.getByLabel("Code").fill(code);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    expect(await visible(page.getByTestId("user-menu")), "user menu did not appear after sign-in");
+    expect(new URL(page.url()).pathname === "/", `signed in at ${page.url()}, expected /`);
+
+    const name = email.split("@")[0] ?? "";
+    const { body: me } = await apiMe(ctx);
+    expect(me.user?.email === email, `GET /api/me user is ${String(me.user?.email)}`);
+    expect(
+      me.activeTenant?.name === `${name}'s workspace`,
+      `Active tenant is ${String(me.activeTenant?.name)}, expected ${name}'s workspace`,
+    );
+    expect(me.role === "owner", `role is ${String(me.role)}, expected owner`);
+    const workspace = page.getByTestId("user-menu").getByLabel("Workspace");
+    expect(
+      (await workspace.locator("option:checked").textContent()) === `${name}'s workspace`,
+      "workspace menu does not show the new workspace",
+    );
+    await checkpoint("signed-in");
+
+    await page.getByRole("button", { name: "Sign out" }).click();
+    await page.waitForURL("**/sign-in", { timeout: 10_000 }).catch(() => undefined);
+    expect(new URL(page.url()).pathname === "/sign-in", `after sign-out at ${page.url()}`);
+    const after = await page.request.get(new URL("/api/me", baseUrl).toString());
+    expect(after.status() === 401, `GET /api/me after sign-out returned ${String(after.status())}`);
+  },
+};
+
+const J008: Journey = {
+  id: "J-008",
+  title: "Invite a member",
+  // The Free workspace's invitation is refused with 402 limit_exceeded.
+  expectedClientErrors: [{ status: 402, path: "/api/tenant/invitations" }],
+  async run(ctx) {
+    const { page, baseUrl, expect, checkpoint } = ctx;
+    const owner = await signedIn(ctx, { plan: "pro" });
+    await page.goto(new URL("/members", baseUrl).toString());
+    const members = page.getByTestId("member-list");
+    expect(await visible(members.getByText(owner.email)), "members page does not list the owner");
+    await checkpoint("members");
+
+    const invitee = uniqueEmail("j008");
+    await page.getByLabel("Email").fill(invitee);
+    await page.getByRole("button", { name: "Send invitation" }).click();
+    expect(
+      await visible(page.getByRole("status").getByText(`Invitation sent to ${invitee}.`)),
+      "no confirmation after sending the invitation",
+    );
+    expect(
+      await visible(page.getByTestId("invitation-list").getByText(invitee)),
+      "the invitation is not listed as waiting",
+    );
+    await checkpoint("invited");
+
+    const link = /https?:\/\/\S+\/invitations\/\S+/.exec(await latestMail(ctx, invitee))?.[0];
+    expect(link !== undefined, `no invitation link in the Outbox for ${invitee}`);
+    await signedIn(ctx, { email: invitee });
+    await page.goto(new URL(new URL(link ?? "/", baseUrl).pathname, baseUrl).toString());
+    await page.getByRole("button", { name: "Accept invitation" }).click();
+    await page.waitForURL(`${baseUrl}/`, { timeout: 10_000 }).catch(() => undefined);
+    expect(await visible(page.getByTestId("user-menu")), "user menu missing after accepting");
+    const { body: me } = await apiMe(ctx);
+    expect(
+      me.activeTenant?.id === owner.tenantId,
+      `invitee's Active tenant is ${String(me.activeTenant?.id)}, expected ${owner.tenantId}`,
+    );
+    expect(me.role === "editor", `invitee role is ${String(me.role)}, expected editor`);
+    await page.goto(new URL("/members", baseUrl).toString());
+    expect(
+      await visible(page.getByTestId("member-list").getByText(invitee)),
+      "the invitee is not listed as a member",
+    );
+    await checkpoint("joined");
+
+    await signedIn(ctx);
+    await page.goto(new URL("/members", baseUrl).toString());
+    await page.getByLabel("Email").fill(uniqueEmail("j008-free"));
+    await page.getByRole("button", { name: "Send invitation" }).click();
+    expect(
+      await visible(page.getByText("The Free plan allows 1 member")),
+      "a Free workspace did not refuse a second member",
+    );
+    await checkpoint("free-limit");
+  },
+};
+
 export const JOURNEYS: ReadonlyMap<string, Journey> = new Map(
-  [J000, J001, JFAIL].map((j) => [j.id, j]),
+  [J000, J001, J002, J008, JFAIL].map((j) => [j.id, j]),
 );
