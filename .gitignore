@@ -12,3 +12,4 @@ packages/*/src/__lint_fixture__*
 workers/*/src/__lint_fixture__*
 workers/api/wrangler.preview.json
 workers/api/wrangler.production.json
+.claude/worktrees/
