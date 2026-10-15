@@ -98,6 +98,8 @@ deploy() {
   if [ -n "${PREVIEW_SECRET_FILE:-}" ]; then
     (umask 077 && printf '%s' "$secret" >"$PREVIEW_SECRET_FILE")
   fi
+  # Signs this preview's session cookies (ADR-0003); never leaves Cloudflare.
+  openssl rand -hex 32 | (cd "$api_dir" && "$wrangler" secret put BETTER_AUTH_SECRET -c "$config") >/dev/null
 
   subdomain="$(cf GET "$acct/workers/subdomain" | jq -r '.result.subdomain')"
   if [ -z "$subdomain" ] || [ "$subdomain" = "null" ]; then

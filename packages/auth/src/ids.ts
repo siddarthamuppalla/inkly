@@ -1,9 +1,9 @@
 import type { DocumentId, TenantId, UserId } from "@inkly/domain";
 
-// ADR-0004: TenantId and UserId are minted only here. Phase 1 adds the
-// membership check that turns a session into an Active tenant's TenantId.
+// ADR-0004: TenantId and UserId are minted only here. A TenantId for an existing
+// tenant comes from session.ts, after the membership check.
 
-function newId(prefix: string): string {
+export function newId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
 }
 
