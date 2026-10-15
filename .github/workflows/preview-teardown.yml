@@ -1,0 +1,31 @@
+name: preview-teardown
+on:
+  pull_request:
+    types: [closed]
+permissions:
+  contents: read
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  teardown:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: delete inkly-pr-${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "⏭️ teardown skipped: Cloudflare secrets are not set" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          .claude/skills/cf-deploy-preview/run.sh --teardown "$PR"
+          left="$(.claude/skills/cf-deploy-preview/run.sh --list "$PR")"
+          if [ -n "$left" ]; then echo "still present:"; echo "$left"; exit 1; fi
