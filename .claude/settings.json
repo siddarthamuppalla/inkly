@@ -1,0 +1,14 @@
+{
+  "extraKnownMarketplaces": {
+    "claude-plugins-official": {
+      "source": { "source": "github", "repo": "anthropics/claude-plugins-official" }
+    },
+    "pstack-claude": {
+      "source": { "source": "github", "repo": "michael-denyer/pstack-claude" }
+    }
+  },
+  "enabledPlugins": {
+    "mattpocock-skills@claude-plugins-official": true,
+    "pstack@pstack-claude": true
+  }
+}
