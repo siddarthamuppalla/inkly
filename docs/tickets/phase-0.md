@@ -32,7 +32,7 @@ Conventions used in every ticket's verification:
 - [ ] GIVEN the workspace THEN packages exist at `apps/web`, `workers/api`, `workers/jobs`, `packages/{domain,storage,pdf,auth,testing}`, each with a `tsconfig.json` extending `tsconfig.base.json`.
 - [ ] GIVEN `tsconfig.base.json` THEN `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax` are all `true`.
 - [ ] GIVEN a clean tree WHEN `pnpm check` runs THEN it exits 0.
-- [ ] GIVEN fixture file `tools/lint-fixtures/web-imports-storage.ts` (in `apps/web`, importing `packages/storage`) WHEN `pnpm lint:fixtures` runs THEN eslint reports `boundaries/element-types` for that file and the script exits 0 only because the violation is expected (fixture asserts the rule fires).
+- [ ] GIVEN fixture file `tools/lint-fixtures/web-imports-storage.ts` (in `apps/web`, importing `packages/storage`) WHEN `pnpm lint:fixtures` runs THEN eslint reports `boundaries/dependencies` (the v7 name of the former `element-types` rule) for that file and the script exits 0 only because the violation is expected (fixture asserts the rule fires).
 - [ ] GIVEN fixture `tools/lint-fixtures/d1-outside-storage.ts` (uses `D1Database` outside `packages/storage`) WHEN `pnpm lint:fixtures` runs THEN the local rule `inkly/no-direct-bindings` fires.
 - [ ] GIVEN a file with a Prettier violation WHEN `pnpm check` runs THEN it exits non-zero.
 
@@ -58,12 +58,12 @@ rg -n '"[\^~]' --glob '**/package.json'   # no matches
 - [ ] GIVEN `CLAUDE.md` THEN it links ADRs 0001–0004, `GLOSSARY.md`, and states the Q11 rule "no `/__test/*` outside dev/preview".
 - [ ] GIVEN `.github/workflows/ci.yml` WHEN a PR is opened THEN jobs `check` and `secrets` both run and conclude `success` on this ticket's PR.
 - [ ] GIVEN `ci.yml` THEN the workflow declares top-level `permissions: contents: read` and no job requests write scopes.
-- [ ] GIVEN `docs/factory/03_FACTORY_WORKFLOW.md` THEN no reference to `repo-seed/` remains (`rg repo-seed docs/` returns nothing).
+- [ ] GIVEN `docs/factory/03_FACTORY_WORKFLOW.md` THEN no reference to `repo-seed/` remains (`rg repo-seed docs/factory` returns nothing).
 - [ ] GIVEN CI steps that reference not-yet-built skills (`verify-pdf`, `verify-tenancy`, e2e) THEN each runs only when its script exists, guarded so a missing script is reported as `skipped` in the job summary, not silently passed; T0.10 removes the guards.
 
 **Verification:**
 ```
-rg -n 'repo-seed' docs/        # no output
+rg -n 'repo-seed' docs/factory  # no output
 gh pr checks <pr>              # check ✓, secrets ✓  (or GitHub MCP: pull_request_read get_check_runs)
 ```
 **Out of scope:** making CI gates *required* (T0.10).

@@ -17,7 +17,7 @@ Then start the first conversation with the prompt in `10_KICKOFF_PROMPT.md`.
 | `08_DEFINITION_OF_DONE.md` | DoD checklist + PR template | Project Knowledge |
 | `09_GLOSSARY.md` | Shared domain vocabulary | Project Knowledge |
 | `10_KICKOFF_PROMPT.md` | First message to send | Paste into first chat |
-| `repo-seed/` | Files to commit to the repo on day 1 (CLAUDE.md, PR template, CI) | Git repo |
+| repo root | `CLAUDE.md`, `.github/pull_request_template.md`, `.github/workflows/ci.yml` (committed on day 1) | Git repo |
 
 **Keep these files living.** When a decision changes, update the file (or an ADR)
 and re-upload — the Project's knowledge is the factory's memory.

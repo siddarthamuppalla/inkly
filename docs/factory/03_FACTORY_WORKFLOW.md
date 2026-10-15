@@ -59,7 +59,7 @@ When fixing a mistake, state: *"Fixed at layer N because …; layers above were 
 
 ## Branching & PRs
 - Branch: `t/<issue#>-<slug>`; one ticket per worktree.
-- Small commits; PR body follows `repo-seed/.github/pull_request_template.md`.
+- Small commits; PR body follows `.github/pull_request_template.md`.
 - Builder never approves its own PR. A new commit invalidates prior verdicts.
 
 ## Decision log
