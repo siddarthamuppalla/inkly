@@ -15,6 +15,22 @@ document SaaS. Read `docs/factory/` (copies of the kickoff pack) before non-triv
 Not done until verified. Every PR includes a Verification Evidence block.
 "Inconclusive" = fail. Bugs need a failing repro first.
 
+## Agent skills
+
+Cloud sessions install `mattpocock-skills` and `pstack` at project scope via the SessionStart hook `.claude/hooks/session-start.sh` (no-op locally and when already installed).
+
+### Issue tracker
+
+GitHub Issues in this repo; ticket template and branch naming in `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five triage roles plus `risk:high`, `needs-human`, `factory-pause`, `phase:0`–`phase:4`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` (not `CONTEXT.md`) + `docs/adr/`. See `docs/agents/domain.md`.
+
 ## Workflow
 Grill → Model → Spec → Ticket → Build (TDD) → Verify → Review → Merge → Retro.
 Use `/poteto-mode <task>` to pick the playbook. Stop at 👤 gates.
