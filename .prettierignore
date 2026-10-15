@@ -1,0 +1,8 @@
+pnpm-lock.yaml
+node_modules
+dist
+.turbo
+.wrangler
+artifacts
+*.md
+docs/

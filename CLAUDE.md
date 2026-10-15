@@ -3,6 +3,14 @@
 This repo is a **software factory** for Inkly, a Cloudflare-hosted PDF &
 document SaaS. Read `docs/factory/` (copies of the kickoff pack) before non-trivial work.
 
+## Decisions & vocabulary
+- ADRs: [0001 monorepo & tooling](docs/adr/0001-monorepo-and-tooling.md) ·
+  [0002 frontend](docs/adr/0002-frontend-framework.md) ·
+  [0003 auth](docs/adr/0003-auth-provider.md) ·
+  [0004 tenant isolation](docs/adr/0004-tenant-isolation.md)
+- Grilling log: `docs/decisions/T0.1-grilling-log.md` · Tickets: `docs/tickets/`
+- Vocabulary: [`GLOSSARY.md`](GLOSSARY.md) — use its terms; add new ones.
+
 ## Rule zero
 Not done until verified. Every PR includes a Verification Evidence block.
 "Inconclusive" = fail. Bugs need a failing repro first.
@@ -15,7 +23,8 @@ Never build a ticket without predicate acceptance criteria.
 ## Commands
 - Install: `pnpm i`
 - Dev: `pnpm dev` (wrangler dev for api + web)
-- Check: `pnpm check` (tsc, eslint, boundaries)
+- Check: `pnpm check` (tsc, eslint incl. boundaries, prettier)
+- Prove lint rules still fire: `pnpm lint:fixtures`
 - Test: `pnpm test` (vitest + vitest-pool-workers)
 - E2E: `pnpm e2e`
 - Verify: `.claude/skills/verify-*/run.sh`
@@ -31,6 +40,10 @@ Never build a ticket without predicate acceptance criteria.
 - `apps/web` must not import `workers/*` or `packages/storage`.
 - `packages/domain` has no I/O.
 - Audit events are append-only and written only by the Envelope/Document DO.
+- No `/__test/*` routes outside dev/preview: they mount only when `TEST_HOOKS=enabled`,
+  which production config must never contain.
+- Enforced by lint: `boundaries/dependencies` and `inkly/no-direct-bindings`
+  (no `D1Database`/`R2Bucket`/`KVNamespace` or `env.DB|FILES|KV` outside `packages/storage`).
 
 ## Fixing mistakes
 Prefer: architecture → lint/types/CI → tests → this file/skills → human review.
