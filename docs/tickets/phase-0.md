@@ -88,7 +88,7 @@ and the GitHub labels (Q10).
 ```
 claude plugin list | rg -A3 'mattpocock-skills|pstack'
 ls docs/agents/
-gh label list --limit 100     # (or GitHub MCP list labels) all 14 present
+gh label list --limit 100     # (or GitHub MCP get_label) all 13 present
 ```
 **Out of scope:** writing a pstack model override sheet (defaults are fine; revisit if costs warrant).
 **Dependencies:** T0.2.
