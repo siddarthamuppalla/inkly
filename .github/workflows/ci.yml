@@ -18,7 +18,7 @@ jobs:
       - run: pnpm check
       - run: pnpm lint:fixtures
       - run: pnpm test
-      # Verify skills land in T0.6/T0.7/T0.9. Until then a missing script is
+      # verify-tenancy lands in T0.9 and e2e later. Until then a missing script is
       # reported as skipped in the job summary; T0.10 removes these guards.
       - name: verify-pdf
         run: |
@@ -27,6 +27,20 @@ jobs:
           else
             echo "⏭️ verify-pdf skipped: .claude/skills/verify-pdf/run.sh not built yet (T0.6)" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
+      - name: verify-app
+        env:
+          WRANGLER_SEND_METRICS: "false"
+        run: |
+          pnpm --filter @inkly/testing exec playwright install --with-deps chromium
+          .claude/skills/verify-app/run.sh --self-test
+          .claude/skills/verify-app/run.sh J-000
+      - name: upload verify-app artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-app
+          path: artifacts/verify-app/
+          if-no-files-found: ignore
       - name: verify-tenancy
         run: |
           if [ -x .claude/skills/verify-tenancy/run.sh ]; then

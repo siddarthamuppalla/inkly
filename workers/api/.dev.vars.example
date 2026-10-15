@@ -1,0 +1,4 @@
+# Copy to .dev.vars (gitignored) to enable test hooks under `pnpm dev`.
+# Never set these in production config (Q11).
+TEST_HOOKS=enabled
+TEST_HOOKS_SECRET=change-me-to-a-long-random-string

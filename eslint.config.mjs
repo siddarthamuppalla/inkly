@@ -13,6 +13,7 @@ export default tseslint.config(
       "**/dist/**",
       "**/.turbo/**",
       "**/.wrangler/**",
+      "apps/web/build/**",
       "tools/lint-fixtures/cases/**",
     ],
   },
