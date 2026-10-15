@@ -2,6 +2,11 @@
 
 A human applies this; agents never change repository settings.
 
+> **Plan note:** GitHub Free does not enforce branch protection or rulesets on
+> private repositories. This repo was made public on 2026-10-15 so that the rules
+> below are enforced. If it ever goes private again, protection becomes advisory
+> until the account moves to GitHub Pro or a Team organization.
+
 ## Required status checks
 All are jobs in `.github/workflows/ci.yml`:
 
