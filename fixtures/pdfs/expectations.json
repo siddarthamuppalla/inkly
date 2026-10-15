@@ -1,0 +1,11 @@
+{
+  "10p.pdf": { "valid": true, "pages": 10 },
+  "50p.pdf": { "valid": true, "pages": 50 },
+  "encrypted.pdf": { "valid": true, "pages": 2, "encrypted": true },
+  "forms.pdf": { "valid": true, "pages": 1, "form": true },
+  "huge-image.pdf": { "valid": true, "pages": 1 },
+  "malformed.pdf": { "valid": false },
+  "rotated.pdf": { "valid": true, "pages": 3, "rotation": [0, 90, 270] },
+  "scanned.pdf": { "valid": true, "pages": 2 },
+  "tiny.pdf": { "valid": true, "pages": 1 }
+}

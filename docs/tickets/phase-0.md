@@ -138,7 +138,7 @@ pnpm check
 ```
 .claude/skills/verify-pdf/run.sh --corpus fixtures/pdfs        # exits 0, table of 9 rows
 .claude/skills/verify-pdf/run.sh fixtures/pdfs/malformed.pdf; echo $?   # non-zero
-pnpm test --filter @inkly/testing      # pixelmatch pass/fail tests
+pnpm --filter @inkly/testing test      # pixelmatch pass/fail tests
 ```
 **Out of scope:** veraPDF `--pdfa` (added with PDF/A export later).
 **Dependencies:** T0.5 (shares `packages/testing`).
