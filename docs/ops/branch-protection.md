@@ -2,13 +2,10 @@
 
 A human applies this; agents never change repository settings.
 
-> **Status (2026-10-15): not enforced.** GitHub Free does not enforce branch
-> protection or rulesets on private repositories. Until the account moves to
-> GitHub Pro, a GitHub Team organization, or the repo goes public, the checks
-> below are advisory. They run on every PR and show red or green, but a red PR
-> can still be merged. The rule that stands in for enforcement: agents never
-> merge to `main` (CLAUDE.md), and the human merges only PRs whose required
-> checks are all green. Apply the command below once enforcement is available.
+> **Plan note:** GitHub Free does not enforce branch protection or rulesets on
+> private repositories. This repo was made public on 2026-10-15 so that the rules
+> below are enforced. If it ever goes private again, protection becomes advisory
+> until the account moves to GitHub Pro or a Team organization.
 
 ## Required status checks
 All are jobs in `.github/workflows/ci.yml`:
