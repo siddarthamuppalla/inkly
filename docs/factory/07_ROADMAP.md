@@ -4,7 +4,7 @@
 Goal: an agent can make a change and **prove** it works.
 - T0.1 Grill session: resolve open decisions in `01_GOAL` → ADRs 0001–0004
 - T0.2 Repo scaffold (monorepo, pnpm, turbo, TS strict, ESLint + boundaries, Prettier)
-- T0.3 Commit `repo-seed/` files (CLAUDE.md, PR template, CI workflow)
+- T0.3 Reconcile the seed files at the repo root (CLAUDE.md, PR template, CI workflow)
 - T0.4 Install skill packs; run `/setup-matt-pocock-skills`, `setup-pstack`
 - T0.5 Hello-world Worker + D1 + R2 bindings; `vitest-pool-workers` test
 - T0.6 Fixture PDF corpus + `verify-pdf` skill

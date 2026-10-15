@@ -3,6 +3,8 @@ on:
   pull_request:
   push:
     branches: [main]
+permissions:
+  contents: read
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -10,14 +12,35 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
+        with: { node-version-file: .nvmrc, cache: pnpm }
       - run: sudo apt-get update && sudo apt-get install -y qpdf poppler-utils
       - run: pnpm i --frozen-lockfile
       - run: pnpm check
+      - run: pnpm lint:fixtures
       - run: pnpm test
-      - run: .claude/skills/verify-pdf/run.sh --corpus fixtures/pdfs
-      - run: .claude/skills/verify-tenancy/run.sh
-      - run: pnpm exec playwright install --with-deps chromium && pnpm e2e --grep @smoke
+      # Verify skills land in T0.6/T0.7/T0.9. Until then a missing script is
+      # reported as skipped in the job summary; T0.10 removes these guards.
+      - name: verify-pdf
+        run: |
+          if [ -x .claude/skills/verify-pdf/run.sh ]; then
+            .claude/skills/verify-pdf/run.sh --corpus fixtures/pdfs
+          else
+            echo "⏭️ verify-pdf skipped: .claude/skills/verify-pdf/run.sh not built yet (T0.6)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: verify-tenancy
+        run: |
+          if [ -x .claude/skills/verify-tenancy/run.sh ]; then
+            .claude/skills/verify-tenancy/run.sh
+          else
+            echo "⏭️ verify-tenancy skipped: .claude/skills/verify-tenancy/run.sh not built yet (T0.9)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: e2e smoke
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.e2e ? 0 : 1)"; then
+            pnpm exec playwright install --with-deps chromium && pnpm e2e --grep @smoke
+          else
+            echo "⏭️ e2e smoke skipped: no e2e script yet (T0.7)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
   secrets:
     runs-on: ubuntu-latest
     permissions:
