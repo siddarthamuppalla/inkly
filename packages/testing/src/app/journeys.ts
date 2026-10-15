@@ -1,8 +1,14 @@
 import type { Page } from "playwright";
 
+import { DOCUMENT_JOURNEYS } from "./documents.ts";
+
 export interface JourneyContext {
   readonly page: Page;
   readonly baseUrl: string;
+  /** The target's test-hooks secret, when the run has one (needed to seed and sign in). */
+  readonly secret: string | undefined;
+  /** This run's artifact directory, for files a journey keeps (e.g. a download). */
+  readonly outDir: string;
   /** Records a failed expectation; the journey keeps going so the report is complete. */
   readonly expect: (condition: boolean, message: string) => void;
   /** Screenshots the page in light and dark schemes and runs an axe WCAG 2.1 A/AA scan of each. */
@@ -121,5 +127,5 @@ const J001: Journey = {
 };
 
 export const JOURNEYS: ReadonlyMap<string, Journey> = new Map(
-  [J000, J001, JFAIL].map((j) => [j.id, j]),
+  [J000, J001, ...DOCUMENT_JOURNEYS, JFAIL].map((j) => [j.id, j]),
 );

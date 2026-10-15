@@ -4,8 +4,8 @@ import {
   RenderingCancelledException,
   type PDFDocumentProxy,
   type RenderTask,
-} from "pdfjs-dist";
-import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+} from "pdfjs-dist/legacy/build/pdf.mjs";
+import workerSrc from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import { useEffect, useRef, useState } from "react";
 
 GlobalWorkerOptions.workerSrc = workerSrc;

@@ -100,7 +100,7 @@ export const api = {
   },
 };
 
-export function contentUrl(id: string, n?: number): string {
+function contentUrl(id: string, n?: number): string {
   return n === undefined
     ? `/api/documents/${id}/content`
     : `/api/documents/${id}/versions/${String(n)}/content`;

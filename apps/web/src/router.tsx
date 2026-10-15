@@ -15,6 +15,7 @@ export const router = createBrowserRouter([
       { index: true, Component: DocumentsRoute },
       {
         path: "documents/:id",
+        HydrateFallback: () => null,
         lazy: async () => ({ Component: (await import("./routes/document.tsx")).DocumentRoute }),
       },
       { path: "trash", Component: TrashRoute },

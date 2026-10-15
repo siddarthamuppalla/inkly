@@ -47,6 +47,7 @@ export async function runJourneys(
   journeys: readonly Journey[],
   baseUrl: string,
   outDir: string,
+  secret?: string,
 ): Promise<JourneyResult[]> {
   mkdirSync(outDir, { recursive: true });
   const browser = await chromium.launch(launchOptions());
@@ -78,6 +79,8 @@ export async function runJourneys(
         await journey.run({
           page,
           baseUrl,
+          secret,
+          outDir,
           expect: (cond, msg) => {
             if (!cond) failures.push(msg);
           },

@@ -7,14 +7,26 @@ import { Page } from "../components/page.tsx";
 import { PageCanvas, usePdf } from "../components/pdf-pages.tsx";
 import { SignedOut } from "../components/signed-out.tsx";
 import { Badge } from "../components/ui/badge.tsx";
-import { Button, buttonVariants } from "../components/ui/button.tsx";
+import { Button } from "../components/ui/button.tsx";
 import { Field } from "../components/ui/field.tsx";
 import { Sheet, SheetBody, SheetHeader, SheetTitle } from "../components/ui/sheet.tsx";
 import { UploadButton, UploadStatus, useUpload } from "../components/upload.tsx";
-import { api, ApiError, contentUrl } from "../lib/api.ts";
+import { api, ApiError } from "../lib/api.ts";
 import { folderChoices, folderPath } from "../lib/folders.ts";
 import { formatBytes, formatDateTime, formatPages } from "../lib/format.ts";
 import { keys, refreshAll, useFolders, useSignedIn } from "../lib/queries.ts";
+
+/** Saves fetched bytes, so a download carries the same credentials as every API call. */
+function saveFile(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 60_000);
+}
 
 function errorText(err: unknown): string {
   return err instanceof ApiError ? err.message : "Something went wrong. Try again.";
@@ -141,6 +153,12 @@ function Actions({ doc }: { readonly doc: DocumentInfo }) {
     },
   });
   const { state, upload } = useUpload({ documentId: doc.id });
+  const download = useMutation({
+    mutationFn: async () => {
+      const bytes = await api.content(doc.id);
+      saveFile(new Blob([bytes], { type: "application/pdf" }), `${doc.title}.pdf`);
+    },
+  });
 
   return (
     <Sheet>
@@ -150,13 +168,14 @@ function Actions({ doc }: { readonly doc: DocumentInfo }) {
       </SheetHeader>
       <SheetBody className="flex flex-col gap-5">
         <div className="flex flex-wrap gap-3">
-          <a
-            href={contentUrl(doc.id)}
-            download={`${doc.title}.pdf`}
-            className={buttonVariants({ variant: "primary" })}
+          <Button
+            loading={download.isPending}
+            onClick={() => {
+              download.mutate();
+            }}
           >
             Download
-          </a>
+          </Button>
           <UploadButton
             variant="secondary"
             busy={state.kind === "uploading"}
@@ -178,6 +197,11 @@ function Actions({ doc }: { readonly doc: DocumentInfo }) {
           >
             {trashed ? "Restore from Trash" : "Move to Trash"}
           </Button>
+          {download.isError && (
+            <p role="alert" className="text-sm font-medium text-destructive">
+              {errorText(download.error)}
+            </p>
+          )}
           {trash.isError && (
             <p role="alert" className="text-sm font-medium text-destructive">
               {errorText(trash.error)}

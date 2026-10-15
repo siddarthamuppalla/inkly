@@ -87,7 +87,7 @@ async function verify(
       secret = local.secret;
     }
     const seed = await seedChecks(baseUrl, secret);
-    const results = await runJourneys(journeys, baseUrl, outDir);
+    const results = await runJourneys(journeys, baseUrl, outDir, secret);
     const all: JourneyResult[] = results;
     const notes = [...seed.notes, ...seed.failures.map((f) => `❌ ${f}`)];
     if (url === undefined) notes.push("Server: local `wrangler dev` started by verify-app");
