@@ -18,7 +18,7 @@ jobs:
       - run: pnpm check
       - run: pnpm lint:fixtures
       - run: pnpm test
-      # verify-tenancy lands in T0.9 and e2e later. Until then a missing script is
+      # e2e lands later. Until then a missing script is
       # reported as skipped in the job summary; T0.10 removes these guards.
       - name: verify-pdf
         run: |
@@ -42,12 +42,11 @@ jobs:
           path: artifacts/verify-app/
           if-no-files-found: ignore
       - name: verify-tenancy
+        env:
+          WRANGLER_SEND_METRICS: "false"
         run: |
-          if [ -x .claude/skills/verify-tenancy/run.sh ]; then
-            .claude/skills/verify-tenancy/run.sh
-          else
-            echo "⏭️ verify-tenancy skipped: .claude/skills/verify-tenancy/run.sh not built yet (T0.9)" | tee -a "$GITHUB_STEP_SUMMARY"
-          fi
+          .claude/skills/verify-tenancy/run.sh
+          .claude/skills/verify-tenancy/run.sh --self-test
       - name: e2e smoke
         run: |
           if node -e "process.exit(require('./package.json').scripts?.e2e ? 0 : 1)"; then

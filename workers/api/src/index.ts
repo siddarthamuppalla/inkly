@@ -2,6 +2,7 @@ import { probeBindings } from "@inkly/storage/health";
 import { Hono } from "hono";
 
 import type { Env } from "./env.ts";
+import { stubDocs } from "./stub-docs.ts";
 import { testHooks } from "./test-hooks.ts";
 
 export type { Env } from "./env.ts";
@@ -15,5 +16,6 @@ app.get("/health", async (c) => {
 });
 
 app.route("/__test", testHooks);
+app.route("/v0/stub-docs", stubDocs);
 
 export default app;
