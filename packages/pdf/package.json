@@ -4,5 +4,18 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --coverage && vitest run -c vitest.workerd.config.ts"
+  },
+  "dependencies": {
+    "@inkly/domain": "workspace:*",
+    "pdf-lib": "1.17.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.4.3",
+    "@inkly/testing": "workspace:*",
+    "@types/node": "22.20.5",
+    "@vitest/coverage-v8": "4.1.12"
   }
 }
