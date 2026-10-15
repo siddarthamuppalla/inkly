@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import app, { type Env } from "../src/index.ts";
 
-const SECRET = "test-secret-0123456789";
+// Random per run so no secret-shaped literal lives in the repo (gitleaks).
+const SECRET = crypto.randomUUID();
 
 function seed(bindings: Partial<Env>, secret?: string) {
   const headers: Record<string, string> = {};
@@ -34,7 +35,8 @@ describe("test hooks", () => {
   });
 
   it("returns 404 with a wrong secret, including one of a different length", async () => {
-    expect((await seed(enabled, "test-secret-0123456788")).status).toBe(404);
+    const sameLength = `${SECRET.slice(0, -1)}${SECRET.endsWith("0") ? "1" : "0"}`;
+    expect((await seed(enabled, sameLength)).status).toBe(404);
     expect((await seed(enabled, "x")).status).toBe(404);
   });
 
