@@ -1,0 +1,26 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: sudo apt-get update && sudo apt-get install -y qpdf poppler-utils
+      - run: pnpm i --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+      - run: .claude/skills/verify-pdf/run.sh --corpus fixtures/pdfs
+      - run: .claude/skills/verify-tenancy/run.sh
+      - run: pnpm exec playwright install --with-deps chromium && pnpm e2e --grep @smoke
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
