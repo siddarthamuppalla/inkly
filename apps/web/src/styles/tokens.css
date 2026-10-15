@@ -1,0 +1,70 @@
+/*
+ * Inkly design tokens: "Paper & Ink". The only place colors are defined.
+ * Names follow shadcn/ui so copied components pick them up unchanged.
+ * Contrast pairs are proven by apps/web/test/contrast.test.ts.
+ */
+:root {
+  color-scheme: light;
+
+  --background: #f6f2e9;
+  --foreground: #1b2333;
+  --card: #fffdf8;
+  --card-foreground: #1b2333;
+  --muted: #ece6d8;
+  --muted-foreground: #565d6b;
+
+  --primary: #1b2333;
+  --primary-foreground: #fffdf8;
+  --secondary: #ece6d8;
+  --secondary-foreground: #1b2333;
+  --accent: #e7edfb;
+  --accent-foreground: #1a3fa8;
+
+  --seal: #b42318;
+  --seal-foreground: #fffdf8;
+  --destructive: #b42318;
+  --destructive-foreground: #fffdf8;
+  --link: #1a47c2;
+  --success: #1d6b3c;
+  --warning: #85540a;
+
+  --border: #ddd5c4;
+  --input: #847b6b;
+  --ring: #1a47c2;
+  --rule: #d9a39c;
+
+  --radius: 0.375rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --background: #14171f;
+    --foreground: #ede6d6;
+    --card: #1b1f29;
+    --card-foreground: #ede6d6;
+    --muted: #242a37;
+    --muted-foreground: #a9afbb;
+
+    --primary: #ede6d6;
+    --primary-foreground: #14171f;
+    --secondary: #242a37;
+    --secondary-foreground: #ede6d6;
+    --accent: #1e2a47;
+    --accent-foreground: #b3cbff;
+
+    --seal: #f0796a;
+    --seal-foreground: #14171f;
+    --destructive: #f0796a;
+    --destructive-foreground: #14171f;
+    --link: #8fb3ff;
+    --success: #74cf96;
+    --warning: #e8b24f;
+
+    --border: #2d3343;
+    --input: #737c8f;
+    --ring: #8fb3ff;
+    --rule: #6b3a37;
+  }
+}
