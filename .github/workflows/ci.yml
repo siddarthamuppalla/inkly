@@ -5,55 +5,67 @@ on:
     branches: [main]
 permissions:
   contents: read
+env:
+  WRANGLER_SEND_METRICS: "false"
+# Each job is one required status check on main (docs/ops/branch-protection.md).
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version-file: .nvmrc, cache: pnpm }
-      - run: sudo apt-get update && sudo apt-get install -y qpdf poppler-utils
-      - run: pnpm i --frozen-lockfile
+      - uses: ./.github/actions/setup
       - run: pnpm check
       - run: pnpm lint:fixtures
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with: { pdf-tools: "true" }
       - run: pnpm test
-      # e2e lands later. Until then a missing script is
-      # reported as skipped in the job summary; T0.10 removes these guards.
-      - name: verify-pdf
-        run: |
-          if [ -x .claude/skills/verify-pdf/run.sh ]; then
-            .claude/skills/verify-pdf/run.sh --corpus fixtures/pdfs
-          else
-            echo "⏭️ verify-pdf skipped: .claude/skills/verify-pdf/run.sh not built yet (T0.6)" | tee -a "$GITHUB_STEP_SUMMARY"
-          fi
-      - name: verify-app
-        env:
-          WRANGLER_SEND_METRICS: "false"
-        run: |
-          pnpm --filter @inkly/testing exec playwright install --with-deps chromium
-          .claude/skills/verify-app/run.sh --self-test
-          .claude/skills/verify-app/run.sh J-000
-      - name: upload verify-app artifacts
-        if: always()
+  verify-pdf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with: { pdf-tools: "true" }
+      - run: .claude/skills/verify-pdf/run.sh --corpus fixtures/pdfs
+  verify-app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with: { chromium: "true" }
+      - run: .claude/skills/verify-app/run.sh --self-test
+      - run: .claude/skills/verify-app/run.sh J-000
+      - if: always()
         uses: actions/upload-artifact@v4
         with:
           name: verify-app
           path: artifacts/verify-app/
           if-no-files-found: ignore
-      - name: verify-tenancy
-        env:
-          WRANGLER_SEND_METRICS: "false"
-        run: |
-          .claude/skills/verify-tenancy/run.sh
-          .claude/skills/verify-tenancy/run.sh --self-test
-      - name: e2e smoke
-        run: |
-          if node -e "process.exit(require('./package.json').scripts?.e2e ? 0 : 1)"; then
-            pnpm exec playwright install --with-deps chromium && pnpm e2e --grep @smoke
-          else
-            echo "⏭️ e2e smoke skipped: no e2e script yet (T0.7)" | tee -a "$GITHUB_STEP_SUMMARY"
-          fi
+  verify-tenancy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: .claude/skills/verify-tenancy/run.sh
+      - run: .claude/skills/verify-tenancy/run.sh --self-test
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc }
+      - run: pnpm audit --audit-level high
+  prod-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc }
+      - run: node scripts/check-prod-config.mjs
   secrets:
     runs-on: ubuntu-latest
     permissions:

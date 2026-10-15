@@ -2,3 +2,13 @@ packages:
   - apps/*
   - workers/*
   - packages/*
+
+overrides:
+  # GHSA-8r5x-fm3f-whwj, GHSA-p8wg-vrv2-v86f (critical), via eslint-plugin-boundaries.
+  handlebars: 4.7.10
+
+auditConfig:
+  ignoreGhsas:
+    # braces (via eslint-plugin-boundaries > micromatch): no patched release exists.
+    # Dev-only lint dependency; it only expands glob patterns from our own eslint config.
+    - GHSA-vfj7-8cjw-p6xm
