@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import app, { type Env } from "../src/index.ts";
 
-const SECRET = "stub-docs-secret-0123456789";
+const SECRET = crypto.randomUUID();
 const hooks: Env = { ...env, TEST_HOOKS: "enabled", TEST_HOOKS_SECRET: SECRET };
 
 async function seed(bindings: Env = hooks) {

@@ -1,3 +1,5 @@
 # False positives reviewed by a human-visible PR comment; each line is a gitleaks fingerprint.
 # Test-only secret literal in workers/api/test/test-hooks.test.ts (PR #15), replaced by a random value.
 023cb151f3f9ad8303f7f56b894485744de74560:workers/api/test/test-hooks.test.ts:generic-api-key:8
+# Test-only secret literal in workers/api/test/stub-docs.test.ts (PR #16), replaced by a random value.
+89ced5f72b99f4bf6d8c93e106d9ede142805e37:workers/api/test/stub-docs.test.ts:generic-api-key:6
