@@ -65,5 +65,9 @@ Never build a ticket without predicate acceptance criteria.
 Prefer: architecture → lint/types/CI → tests → this file/skills → human review.
 When you add a rule here, ask whether a lint rule or type could enforce it instead.
 
+## CI gates
+Required checks on `main` are listed in `docs/ops/branch-protection.md`; a new
+verify skill adds a CI job there and to that list.
+
 ## Never without a human
 Merge to main, prod deploy, prod data changes, billing, customer messages, secrets, force-push.
