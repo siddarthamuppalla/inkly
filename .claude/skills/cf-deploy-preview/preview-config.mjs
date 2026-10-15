@@ -1,13 +1,16 @@
 // Writes workers/api/wrangler.preview.json: the production wrangler.jsonc with the
 // name and bindings pointed at one PR's isolated resources and test hooks on (Q9, Q11).
-// usage: node preview-config.mjs <name> <d1-uuid> <kv-id>
+// With --production it writes wrangler.production.json instead: same rewrite, test
+// hooks never added.
+// usage: node preview-config.mjs <name> <d1-uuid> <kv-id> [--production]
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const [name, d1Id, kvId] = process.argv.slice(2);
+const [name, d1Id, kvId, mode] = process.argv.slice(2);
+const production = mode === "--production";
 if (!name || !d1Id || !kvId) {
-  console.error("usage: preview-config.mjs <name> <d1-uuid> <kv-id>");
+  console.error("usage: preview-config.mjs <name> <d1-uuid> <kv-id> [--production]");
   process.exit(2);
 }
 
@@ -49,7 +52,8 @@ config.kv_namespaces = config.kv_namespaces.map((k) =>
   k.binding === "KV" ? { ...k, id: kvId } : k,
 );
 // Previews never send real mail: it lands in the Outbox (Q5).
-config.vars = { ...config.vars, TEST_HOOKS: "enabled", EMAIL_PROVIDER: "outbox" };
+if (!production) config.vars = { ...config.vars, TEST_HOOKS: "enabled", EMAIL_PROVIDER: "outbox" };
 
-writeFileSync(join(apiDir, "wrangler.preview.json"), `${JSON.stringify(config, null, 2)}\n`);
-console.log(join(apiDir, "wrangler.preview.json"));
+const out = join(apiDir, production ? "wrangler.production.json" : "wrangler.preview.json");
+writeFileSync(out, `${JSON.stringify(config, null, 2)}\n`);
+console.log(out);
