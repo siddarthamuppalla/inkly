@@ -60,6 +60,9 @@ _Avoid_: quota, credits
 
 ## Factory
 
+**Preview environment**: An isolated per-PR deployment (`inkly-pr-<n>`) with its own Worker, D1, R2 and KV; destroyed when the PR closes.
+_Avoid_: staging
+
 **Paved road**: The single sanctioned way to do a concern in the codebase.
 
 **Verification Evidence**: Required PR block proving acceptance criteria hold.
