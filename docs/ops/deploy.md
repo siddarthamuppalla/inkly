@@ -15,7 +15,7 @@ the GitHub `production` environment.
 4. Creates `BETTER_AUTH_SECRET` once if it is missing, and copies
    `RESEND_API_KEY`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from GitHub
    secrets when they are set.
-5. Waits for five healthy `/health` responses in a row, then checks that
+5. Waits for ten healthy `/health` responses in a row, then checks that
    `POST /__test/seed` returns 404.
 
 After that, the workflow runs `verify-app J-000` against the production URL.
