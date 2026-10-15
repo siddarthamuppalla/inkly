@@ -76,6 +76,8 @@ _Avoid_: staging
 
 **Verification Evidence**: Required PR block proving acceptance criteria hold.
 
+**Perf baseline**: `.claude/skills/verify-perf/perf-baseline.json`, the p95 per PDF op that `verify-perf` compares against; a p95 over 3 s always fails, and one more than 20% (and 50 ms) above its baseline fails as a regression.
+
 **Feature map**: Catalogue of user journeys verified by `verify-app`.
 
 **Gate (👤)**: A pipeline step requiring explicit human confirmation.
