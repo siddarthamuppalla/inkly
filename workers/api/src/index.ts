@@ -1,13 +1,18 @@
 import { probeBindings } from "@inkly/storage/health";
 import { Hono } from "hono";
 
+import { documentRoutes } from "./documents.ts";
 import type { Env } from "./env.ts";
-import { stubDocs } from "./stub-docs.ts";
+import { onAppError } from "./errors.ts";
+import { folderRoutes } from "./folders.ts";
+import { requireTenant } from "./tenant-context.ts";
 import { testHooks } from "./test-hooks.ts";
 
 export type { Env } from "./env.ts";
 
 const app = new Hono<{ Bindings: Env }>();
+
+app.onError(onAppError);
 
 app.get("/health", async (c) => {
   const bindings = await probeBindings(c.env);
@@ -16,6 +21,10 @@ app.get("/health", async (c) => {
 });
 
 app.route("/__test", testHooks);
-app.route("/v0/stub-docs", stubDocs);
+
+app.use("/api/documents/*", requireTenant);
+app.route("/api/documents", documentRoutes);
+app.use("/api/folders/*", requireTenant);
+app.route("/api/folders", folderRoutes);
 
 export default app;

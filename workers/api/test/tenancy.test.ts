@@ -1,9 +1,19 @@
-import type { DocumentId, TenantId } from "@inkly/domain";
-import { createTenant, getTenant, getVersionBytes, putVersionBytes } from "@inkly/storage";
+import type { DocumentId, TenantId, UserId } from "@inkly/domain";
+import {
+  createDocument,
+  createTenant,
+  getDocument,
+  getTenant,
+  listTenantObjectKeys,
+  openVersion,
+} from "@inkly/storage";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
+import { sha256 } from "./helpers.ts";
+
 const doc = "d_1" as DocumentId;
+const user = "u_1" as UserId;
 
 function freshTenants(): [TenantId, TenantId] {
   const run = crypto.randomUUID().slice(0, 8);
@@ -28,13 +38,23 @@ describe("tenant isolation in packages/storage (ADR-0004)", () => {
     expect(await getTenant(tenantB, env)).toBeNull();
   });
 
-  it("does not return tenant A's file when reading the same document id as tenant B", async () => {
+  it("does not return tenant A's Document or bytes when reading the same id as tenant B", async () => {
     const [tenantA, tenantB] = freshTenants();
-    const bytes = new TextEncoder().encode("%PDF-1.7 tenant A");
-    await putVersionBytes(tenantA, env, doc, 1, bytes);
+    await createTenant(tenantA, env, "A");
+    await createTenant(tenantB, env, "B");
+    const body = new TextEncoder().encode("%PDF-1.7 tenant A");
+    await createDocument(
+      tenantA,
+      env,
+      { id: doc, title: "A", folderId: null },
+      { body, sha256: await sha256(body), pages: 1, createdBy: user },
+    );
 
-    const asA = await getVersionBytes(tenantA, env, doc, 1);
-    expect(asA && new TextDecoder().decode(asA)).toBe("%PDF-1.7 tenant A");
-    expect(await getVersionBytes(tenantB, env, doc, 1)).toBeNull();
+    const asA = await openVersion(tenantA, env, doc);
+    expect(asA && (await new Response(asA.object.body).text())).toBe("%PDF-1.7 tenant A");
+    expect(await openVersion(tenantB, env, doc)).toBeNull();
+    expect(await openVersion(tenantB, env, doc, 1)).toBeNull();
+    expect(await getDocument(tenantB, env, doc)).toBeNull();
+    expect(await listTenantObjectKeys(tenantB, env)).toEqual([]);
   });
 });

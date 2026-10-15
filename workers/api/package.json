@@ -6,15 +6,18 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@inkly/auth": "workspace:*",
+    "@inkly/pdf": "workspace:*",
     "@inkly/storage": "workspace:*",
     "hono": "4.13.13",
-    "@inkly/auth": "workspace:*"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "1.4.3",
     "@cloudflare/workers-types": "5.20261015.1",
     "@inkly/domain": "workspace:*",
     "@inkly/testing": "workspace:*",
+    "pdf-lib": "1.17.1",
     "vitest": "4.1.12",
     "wrangler": "4.151.0"
   },
