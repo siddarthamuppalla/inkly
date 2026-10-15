@@ -12,9 +12,9 @@ export function Sheet({ className, folded = false, ...props }: SheetProps) {
   return (
     <div
       className={cn(
-        "relative rounded-md border bg-card text-card-foreground shadow-[0_1px_0_0_var(--border),0_12px_24px_-18px_rgb(0_0_0/0.35)]",
+        "relative rounded-md border bg-card text-card-foreground shadow-sheet",
         folded &&
-          "rounded-tr-none [clip-path:polygon(0_0,calc(100%-1.25rem)_0,100%_1.25rem,100%_100%,0_100%)] before:absolute before:right-0 before:top-0 before:size-5 before:rounded-bl-sm before:bg-muted before:content-['']",
+          "rounded-tr-none [clip-path:polygon(0_0,calc(100%-var(--fold))_0,100%_var(--fold),100%_100%,0_100%)] before:absolute before:right-0 before:top-0 before:size-(--fold) before:rounded-bl-sm before:bg-muted before:content-['']",
         className,
       )}
       {...props}

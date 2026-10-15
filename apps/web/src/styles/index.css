@@ -13,6 +13,7 @@
   --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
   --font-sans: "Atkinson Hyperlegible Next Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --shadow-*: initial;
 }
 
 @theme inline {
@@ -44,6 +45,16 @@
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 4px);
+
+  /* Elevation: a hard ink stamp for actions, a soft lift for paper. */
+  --shadow-stamp: 3px 3px 0 0 var(--seal);
+  --shadow-stamp-lift: 4px 4px 0 0 var(--seal);
+  --shadow-stamp-ink: 3px 3px 0 0 var(--foreground);
+  --shadow-sheet: 0 1px 0 0 var(--border), 0 12px 24px -18px var(--shadow-color);
+  --shadow-margin: inset 2px 0 0 0 var(--seal);
+
+  --default-transition-duration: var(--duration-fast);
+  --default-transition-timing-function: var(--ease-ink);
 }
 
 @layer base {

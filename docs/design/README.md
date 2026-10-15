@@ -21,7 +21,10 @@ act on, and one red seal. The live reference is the `/design` route in `apps/web
 | Components (shadcn/ui pattern, copied in) | `apps/web/src/components/ui/` |
 | Brand marks | `apps/web/src/components/brand/` |
 | Contrast proof | `apps/web/test/contrast.test.ts` and its pair list in `test/contrast.ts` |
-| Rendered a11y proof | `verify-app` checkpoints run axe in light and dark (J-000, J-001) |
+| Rendered a11y proof | `verify-app` checkpoints run axe (WCAG 2.0 to 2.2 A/AA) in light and dark; J-001 also checks keyboard focus and 320px reflow |
+| Raw-color guard | `inkly/no-raw-colors` lint rule (`tools/eslint-rules/no-raw-colors.mjs`) |
+| Component specs | [`components.md`](components.md) |
+| Latest audit | [`audit-2026-10-15.md`](audit-2026-10-15.md) |
 
 ## Tokens
 
@@ -30,7 +33,9 @@ Token names follow shadcn/ui (`background`, `foreground`, `primary`, `muted-fore
 `seal`, `link`, `success`, `warning` and `rule`.
 
 Tailwind's stock palette is switched off (`--color-*: initial`). `bg-blue-500` generates no
-CSS, so every color on screen traces back to `tokens.css`.
+CSS, and the `inkly/no-raw-colors` lint rejects hex or `rgb()` literals in `apps/web/src`, so
+every color on screen traces back to `tokens.css`. Shadows (`shadow-stamp`, `shadow-sheet`) and
+motion (`--duration-fast`, `--ease-ink`) are tokens too.
 
 When you add a token or put two tokens together in a new way, add the pair to
 `CONTRAST_PAIRS`. Text needs 4.5:1 and UI edges and focus need 3:1, in both themes.

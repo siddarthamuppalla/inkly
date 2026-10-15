@@ -121,16 +121,17 @@ export function DesignRoute() {
             <Button size="sm">Small</Button>
             <Button size="lg">Large</Button>
             <Button disabled>Disabled</Button>
+            <Button loading>Sending…</Button>
           </div>
         </Section>
 
         <Section title="Status">
           <div className="flex flex-wrap gap-3">
             <Badge>Draft</Badge>
-            <Badge tone="info">Sent</Badge>
-            <Badge tone="warning">Waiting on 1 signer</Badge>
-            <Badge tone="success">Signed</Badge>
-            <Badge tone="danger">Voided</Badge>
+            <Badge variant="info">Sent</Badge>
+            <Badge variant="warning">Waiting on 1 signer</Badge>
+            <Badge variant="success">Signed</Badge>
+            <Badge variant="danger">Voided</Badge>
           </div>
         </Section>
 
@@ -141,18 +142,21 @@ export function DesignRoute() {
               e.preventDefault();
             }}
           >
+            <p className="text-sm text-muted-foreground">
+              Fields marked <span className="text-seal">*</span> are required.
+            </p>
             <Field label="Recipient name" required autoComplete="name" />
             <Field
               label="Email"
               type="email"
-              hint="They get a one-time code before they can sign."
+              hint="We email them a one-time code to confirm it’s them before they sign."
               autoComplete="email"
             />
             <Field
               label="Link password"
               type="password"
               defaultValue="abc"
-              error="Use at least 8 characters."
+              error="This password is too short. Use at least 8 characters."
               autoComplete="new-password"
             />
           </form>
@@ -166,7 +170,7 @@ export function DesignRoute() {
                 <p className="tabular text-sm text-muted-foreground">12 pages · 1.4 MB</p>
               </SheetHeader>
               <SheetBody className="flex items-center justify-between gap-3">
-                <Badge tone="warning">Waiting on 1 signer</Badge>
+                <Badge variant="warning">Waiting on 1 signer</Badge>
                 <Button variant="secondary" size="sm">
                   Open
                 </Button>
@@ -184,8 +188,14 @@ export function DesignRoute() {
         </Section>
 
         <Section title="Empty state">
-          <EmptyState title="A blank page">
-            <p>Every empty list says what will appear and what the user can do about it.</p>
+          <EmptyState
+            title="No documents yet"
+            action={<Button variant="secondary">Upload a PDF</Button>}
+          >
+            <p>
+              Say what will appear here, why it is empty, and the one action that fills it. Leave
+              the action out until the feature exists.
+            </p>
           </EmptyState>
         </Section>
       </div>

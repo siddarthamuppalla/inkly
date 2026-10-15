@@ -109,6 +109,14 @@ const J001: Journey = {
       .getAttribute("id")
       .catch(() => null);
     expect(afterSkip === "main", `skip link moved focus to ${String(afterSkip)}, expected #main`);
+
+    // WCAG 1.4.10 Reflow: at 320 CSS px nothing may need horizontal scrolling.
+    await page.setViewportSize({ width: 320, height: 800 });
+    const overflow = await page.evaluate<number>(
+      "document.documentElement.scrollWidth - document.documentElement.clientWidth",
+    );
+    expect(overflow <= 0, `/design scrolls horizontally by ${String(overflow)}px at 320px wide`);
+    await checkpoint("design-320");
   },
 };
 

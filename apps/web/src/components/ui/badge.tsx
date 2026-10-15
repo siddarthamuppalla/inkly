@@ -7,7 +7,7 @@ const badgeVariants = cva(
   "inline-flex items-center gap-1.5 rounded-full border border-current px-2.5 py-0.5 text-sm font-medium leading-5",
   {
     variants: {
-      tone: {
+      variant: {
         neutral: "text-muted-foreground",
         info: "text-link",
         success: "text-success",
@@ -15,16 +15,16 @@ const badgeVariants = cva(
         danger: "text-destructive",
       },
     },
-    defaultVariants: { tone: "neutral" },
+    defaultVariants: { variant: "neutral" },
   },
 );
 
 export type BadgeProps = ComponentProps<"span"> & VariantProps<typeof badgeVariants>;
 
 /** A status mark. The label carries the meaning; color only reinforces it. */
-export function Badge({ className, tone, children, ...props }: BadgeProps) {
+export function Badge({ className, variant, children, ...props }: BadgeProps) {
   return (
-    <span className={cn(badgeVariants({ tone }), className)} {...props}>
+    <span className={cn(badgeVariants({ variant }), className)} {...props}>
       <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
       {children}
     </span>

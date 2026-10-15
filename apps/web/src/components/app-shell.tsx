@@ -38,7 +38,7 @@ export function AppShell() {
           <Wordmark />
         </NavLink>
         <nav aria-label="Primary">
-          <ul className="flex gap-1 md:flex-col">
+          <ul className="flex flex-wrap gap-1 md:flex-col">
             {NAV.map((item) => (
               <li key={item.to}>
                 <NavLink
@@ -47,7 +47,7 @@ export function AppShell() {
                   className={({ isActive }) =>
                     cn(
                       "block rounded-md px-3 py-2 text-foreground no-underline hover:bg-muted",
-                      isActive && "bg-muted font-semibold shadow-[inset_2px_0_0_0_var(--seal)]",
+                      isActive && "bg-muted font-semibold shadow-margin",
                     )
                   }
                 >
@@ -58,7 +58,7 @@ export function AppShell() {
           </ul>
         </nav>
         <div className="mt-auto hidden flex-col gap-3 text-sm md:flex">
-          <NavLink to="/design" className="text-muted-foreground">
+          <NavLink to="/design" className="-mx-1 block px-1 py-1 text-muted-foreground">
             Design system
           </NavLink>
           <HealthStatus />

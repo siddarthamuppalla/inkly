@@ -42,7 +42,7 @@ Every run:
 3. runs each journey in a fresh browser context.
 
 Each `checkpoint(name)` in a journey screenshots the page in the light and dark color
-schemes and runs axe-core against WCAG 2.0/2.1 A and AA rules in each. A journey fails on
+schemes and runs axe-core against WCAG 2.0/2.1/2.2 A and AA rules in each. A journey fails on
 a failed expectation, on any console error or uncaught page error, on any 5xx response,
 and on any axe violation. Failed requests (for example aborted ones) are
 recorded in the summary but do not fail the run.

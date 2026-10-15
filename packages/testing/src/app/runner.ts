@@ -25,8 +25,8 @@ export interface RunInfo {
   readonly notes: readonly string[];
 }
 
-/** WCAG 2.0 and 2.1, levels A and AA: the bar Inkly holds itself to. */
-const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+/** WCAG 2.0, 2.1 and 2.2, levels A and AA: the bar Inkly holds itself to. */
+const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 const SCHEMES = ["light", "dark"] as const;
 
 async function axeScan(page: Page, scheme: string): Promise<string[]> {

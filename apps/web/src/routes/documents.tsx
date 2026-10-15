@@ -4,10 +4,10 @@ import { EmptyState } from "../components/ui/empty-state.tsx";
 export function DocumentsRoute() {
   return (
     <Page title="Documents" lede="Every PDF in this workspace, newest first.">
-      <EmptyState title="Nothing on the desk yet">
+      <EmptyState title="No documents yet">
         <p>
-          Uploaded PDFs land here. From a document you can rotate, merge and split pages, compress
-          it, send it for signature, or share it with a link.
+          PDFs you upload appear here. From a document you can rotate, merge and split pages,
+          compress it, send it for signature, or share it with a link.
         </p>
       </EmptyState>
     </Page>
