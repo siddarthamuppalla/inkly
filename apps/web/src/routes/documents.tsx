@@ -4,29 +4,27 @@ import { useState, type DragEvent, type SyntheticEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 
 import { Page } from "../components/page.tsx";
-import { SignedOut } from "../components/signed-out.tsx";
 import { Button, buttonVariants } from "../components/ui/button.tsx";
 import { EmptyState } from "../components/ui/empty-state.tsx";
 import { Field } from "../components/ui/field.tsx";
 import { UploadButton, UploadStatus, useUpload } from "../components/upload.tsx";
-import { api, ApiError } from "../lib/api.ts";
+import { ApiError } from "../lib/api.ts";
+import { documentsApi } from "../lib/documents-api.ts";
 import { cn } from "../lib/cn.ts";
 import { folderPath } from "../lib/folders.ts";
 import { formatBytes, formatDateTime, formatPages } from "../lib/format.ts";
-import { keys, refreshAll, useFolders, useSignedIn } from "../lib/queries.ts";
+import { keys, refreshAll, useFolders } from "../lib/queries.ts";
 
 function errorText(err: unknown): string {
   return err instanceof ApiError ? err.message : "Something went wrong. Try again.";
 }
 
 export function DocumentsRoute() {
-  const signedIn = useSignedIn();
   const [params] = useSearchParams();
   const folderId = params.get("folder");
   return (
     <Page title="Documents" lede="Every PDF in this workspace, newest first.">
-      {signedIn === false && <SignedOut />}
-      {signedIn === true && <Workspace folderId={folderId} />}
+      <Workspace folderId={folderId} />
     </Page>
   );
 }
@@ -35,7 +33,7 @@ function Workspace({ folderId }: { readonly folderId: string | null }) {
   const folders = useFolders(true);
   const documents = useQuery({
     queryKey: keys.documents(folderId),
-    queryFn: () => api.documents(folderId),
+    queryFn: () => documentsApi.documents(folderId),
   });
   const { state, upload } = useUpload({ folderId });
   const [creating, setCreating] = useState(false);
@@ -158,7 +156,7 @@ function NewFolderForm({
 }) {
   const [name, setName] = useState("");
   const create = useMutation({
-    mutationFn: () => api.createFolder(name.trim(), parentId),
+    mutationFn: () => documentsApi.createFolder(name.trim(), parentId),
     onSuccess: async () => {
       await refreshAll();
       onClose();
@@ -244,14 +242,14 @@ function FolderRow({ folder }: { readonly folder: FolderInfo }) {
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(folder.name);
   const rename = useMutation({
-    mutationFn: () => api.renameFolder(folder.id, name.trim()),
+    mutationFn: () => documentsApi.renameFolder(folder.id, name.trim()),
     onSuccess: async () => {
       await refreshAll();
       setRenaming(false);
     },
   });
   const remove = useMutation({
-    mutationFn: () => api.deleteFolder(folder.id),
+    mutationFn: () => documentsApi.deleteFolder(folder.id),
     onSuccess: refreshAll,
   });
   const failure = rename.error ?? remove.error;

@@ -42,7 +42,7 @@ export const requireTenant: MiddlewareHandler<{ Bindings: Env; Variables: Tenant
   c,
   next,
 ) => {
-  const session = await authenticate(c.req.raw.headers, c.env);
+  const session = await authenticate(c.req.raw, c.env);
   if (!session) return c.json({ error: "unauthenticated" }, 401);
   c.set("session", session);
   const requested = c.req.header("x-inkly-tenant") ?? c.req.query("tenant");

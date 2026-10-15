@@ -119,15 +119,7 @@ describe("upload", () => {
   });
 });
 
-describe("GET /api/session", () => {
-  it("answers 200 whether or not the caller is signed in", async () => {
-    const a = await seed();
-    const anon = await as({ token: "f".repeat(64) }, "/api/session");
-    expect([anon.status, await anon.json()]).toEqual([200, { signedIn: false }]);
-    const signed = await as(a, "/api/session");
-    expect([signed.status, await signed.json()]).toEqual([200, { signedIn: true }]);
-  });
-
+describe("signed-out callers", () => {
   it("leaves the list routes behind requireTenant", async () => {
     expect((await as({ token: "f".repeat(64) }, "/api/documents")).status).toBe(401);
     expect((await as({ token: "f".repeat(64) }, "/api/folders")).status).toBe(401);

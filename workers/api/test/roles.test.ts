@@ -1,3 +1,4 @@
+import type { Role } from "@inkly/auth";
 import type { TenantId, UserId } from "@inkly/domain";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
@@ -6,13 +7,12 @@ import { documentRoutes } from "../src/documents.ts";
 import { onAppError } from "../src/errors.ts";
 import { folderRoutes } from "../src/folders.ts";
 import type { Env } from "../src/index.ts";
-import { roleOf } from "../src/roles.ts";
 import type { TenantVars } from "../src/tenant-context.ts";
 import { accessLog, fixture, folder, hooks, json, seed, uploaded } from "./helpers.ts";
 
-// T1.1 adds `role` to Session. Until then a session without one acts as its Tenant's owner.
+// A viewer Member is injected directly: seeding always makes an owner.
 
-function appAs(who: { tenantId: TenantId; userId: string }, role: string) {
+function appAs(who: { tenantId: TenantId; userId: string }, role: Role) {
   const session = { tenantId: who.tenantId, userId: who.userId as UserId, role };
   const app = new Hono<{ Bindings: Env; Variables: TenantVars }>();
   app.onError(onAppError);
@@ -25,14 +25,6 @@ function appAs(who: { tenantId: TenantId; userId: string }, role: string) {
   app.route("/api/folders", folderRoutes);
   return (path: string, init: RequestInit = {}) => app.request(path, init, hooks);
 }
-
-describe("roleOf", () => {
-  it("reads the session's role and treats a session without one as owner", () => {
-    const base = { tenantId: "ten_1" as TenantId, userId: "usr_1" as UserId };
-    expect(roleOf(base)).toBe("owner");
-    expect(roleOf({ ...base, role: "viewer" } as typeof base)).toBe("viewer");
-  });
-});
 
 describe("a viewer Member", () => {
   it("gets 403 (logged) for upload, delete and move, and can still read", async () => {

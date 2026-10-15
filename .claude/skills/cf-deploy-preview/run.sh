@@ -28,6 +28,7 @@ deploy() {
   if [ -n "${PREVIEW_SECRET_FILE:-}" ]; then
     (umask 077 && printf '%s' "$secret" >"$PREVIEW_SECRET_FILE")
   fi
+  ensure_random_secret "$config" BETTER_AUTH_SECRET
 
   url="$(workers_dev_url "$name")"
 

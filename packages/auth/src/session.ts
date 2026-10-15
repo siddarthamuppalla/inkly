@@ -1,48 +1,74 @@
 import type { TenantId, UserId } from "@inkly/domain";
-import { createSession, findSession, type StorageEnv } from "@inkly/storage";
+import { findMembership, listMembershipsOfUser, type MembershipRow } from "@inkly/storage/auth";
 
-// Phase 0 bearer sessions, issued only by test seeding. Better-Auth replaces this
-// in Phase 1 (ADR-0003); callers keep using authenticate() and resolveTenant().
+import { getAuth } from "./better-auth.ts";
+import { testHooksOn, type AuthEnv } from "./env.ts";
 
-export interface AuthEnv extends StorageEnv {
-  TEST_HOOKS?: string;
-  /** Self-test only: "leak" makes resolveTenant trust the client's tenant header. */
-  VERIFY_TENANCY_SELFTEST?: string;
+export const ROLES = ["owner", "admin", "editor", "viewer"] as const;
+export type Role = (typeof ROLES)[number];
+
+export function isRole(value: unknown): value is Role {
+  return typeof value === "string" && (ROLES as readonly string[]).includes(value);
 }
 
+/** Who is calling and the Active tenant they act within, after the membership check. */
 export interface Session {
   readonly tenantId: TenantId;
   readonly userId: UserId;
+  readonly role: Role;
 }
 
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
-
-async function sha256Hex(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+export interface SignedInUser {
+  readonly userId: UserId;
+  readonly email: string;
+  readonly name: string;
+  /** The session's Active tenant as stored, before any membership check. */
+  readonly activeTenantId: string | null;
 }
 
-export async function issueSession(
-  tenantId: TenantId,
-  userId: UserId,
+/** The signed-in User from the session cookie or `Authorization: Bearer`, or null. */
+export async function currentUser(request: Request, env: AuthEnv): Promise<SignedInUser | null> {
+  const result = await getAuth(env, request.url).api.getSession({ headers: request.headers });
+  if (!result) return null;
+  return {
+    userId: result.user.id as UserId,
+    email: result.user.email,
+    name: result.user.name,
+    activeTenantId:
+      (result.session as { activeOrganizationId?: string | null }).activeOrganizationId ?? null,
+  };
+}
+
+/**
+ * The membership a request acts within: the session's Active tenant when the User is
+ * still a Member of it, otherwise their oldest membership.
+ */
+export async function activeMembership(
   env: AuthEnv,
-): Promise<string> {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  const token = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-  await createSession(tenantId, env, {
-    tokenHash: await sha256Hex(token),
-    userId,
-    expiresAt: Date.now() + SESSION_TTL_MS,
-  });
-  return token;
+  user: SignedInUser,
+): Promise<MembershipRow | null> {
+  const active = user.activeTenantId
+    ? await findMembership(env, user.userId, user.activeTenantId)
+    : null;
+  if (active) return active;
+  const [first] = await listMembershipsOfUser(env, user.userId);
+  return first ?? null;
 }
 
-/** The caller's session from the request headers (`Authorization: Bearer <token>`), or null. */
-export async function authenticate(headers: Headers, env: AuthEnv): Promise<Session | null> {
-  const token = /^Bearer ([0-9a-f]{64})$/.exec(headers.get("authorization") ?? "")?.[1];
-  if (token === undefined) return null;
-  const row = await findSession(env, await sha256Hex(token));
-  return row ? { tenantId: row.tenantId, userId: row.userId } : null;
+export function sessionOf(user: SignedInUser, membership: MembershipRow): Session {
+  return {
+    userId: user.userId,
+    tenantId: membership.tenantId as TenantId,
+    role: isRole(membership.role) ? membership.role : "viewer",
+  };
+}
+
+/** The caller's Session, or null when they are signed out or belong to no Tenant. */
+export async function authenticate(request: Request, env: AuthEnv): Promise<Session | null> {
+  const user = await currentUser(request, env);
+  if (!user) return null;
+  const membership = await activeMembership(env, user);
+  return membership ? sessionOf(user, membership) : null;
 }
 
 export type TenantResolution = { ok: true; tenantId: TenantId } | { ok: false };
@@ -59,7 +85,7 @@ export function resolveTenant(
   if (requested === undefined || requested === session.tenantId) {
     return { ok: true, tenantId: session.tenantId };
   }
-  if (env.TEST_HOOKS === "enabled" && env.VERIFY_TENANCY_SELFTEST === "leak") {
+  if (testHooksOn(env) && env.VERIFY_TENANCY_SELFTEST === "leak") {
     // Deliberate bug for `verify-tenancy --self-test`; unreachable without test hooks.
     return { ok: true, tenantId: requested as TenantId };
   }

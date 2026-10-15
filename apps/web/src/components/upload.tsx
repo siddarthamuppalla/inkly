@@ -1,7 +1,8 @@
 import type { DocumentInfo } from "@inkly/domain";
 import { useRef, useState, type ReactNode } from "react";
 
-import { ApiError, uploadPdf } from "../lib/api.ts";
+import { ApiError } from "../lib/api.ts";
+import { uploadPdf } from "../lib/documents-api.ts";
 import { refreshAll } from "../lib/queries.ts";
 import { Button, type ButtonProps } from "./ui/button.tsx";
 

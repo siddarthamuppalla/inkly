@@ -1,5 +1,5 @@
-// verify-tenancy: as tenant A, try to reach tenant B's Documents, Versions, folders and
-// content every way we know. Every attempt must be refused (403/404) and leave an
+// verify-tenancy: as tenant A, try to reach tenant B's Documents, Versions, folders,
+// content and workspace every way we know. Every attempt must be refused (403/404) and leave an
 // access-log entry.
 
 import { readFileSync } from "node:fs";
@@ -223,6 +223,27 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
       init: json({ parentId: folderB }),
     },
     { name: "delete B's folder", method: "DELETE", path: `/api/folders/${folderB}` },
+    {
+      name: "switch Active tenant to B",
+      method: "POST",
+      path: "/api/me/active-tenant",
+      init: json({ tenantId: b.tenantId }),
+    },
+    {
+      name: "list B's members claiming B's tenant",
+      method: "GET",
+      path: "/api/tenant/members",
+      init: { headers: asB },
+    },
+    {
+      name: "invite into B claiming B's tenant",
+      method: "POST",
+      path: "/api/tenant/invitations",
+      init: {
+        ...json({ email: "intruder@seed.inkly.test", role: "admin" }),
+        headers: { "content-type": "application/json", ...asB },
+      },
+    },
   ];
 
   const attempts: Attempt[] = [];
@@ -259,6 +280,19 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     document?: Doc;
   };
   if (docANow.document?.folderId !== folderA) problems.push("A's Document left A's folder");
+
+  const me = (await (await call(baseUrl, a, "GET", "/api/me")).json()) as {
+    activeTenant?: { id?: string } | null;
+  };
+  if (me.activeTenant?.id !== a.tenantId) {
+    problems.push(`A's Active tenant is ${String(me.activeTenant?.id)} after the switch attempt`);
+  }
+  const listAfter = (await (await call(baseUrl, a, "GET", "/api/documents")).json()) as {
+    documents?: { id: string }[];
+  };
+  if ((listAfter.documents ?? []).some((d) => d.id === docB.id)) {
+    problems.push("A's list includes B's Document after the switch attempt");
+  }
 
   const deniedEntries = (await logOf()).filter((e) => e.status === 403 || e.status === 404).length;
   const deniedCount = attempts.filter((t) => t.denied).length;

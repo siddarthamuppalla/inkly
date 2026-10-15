@@ -2,26 +2,24 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 
 import { Page } from "../components/page.tsx";
-import { SignedOut } from "../components/signed-out.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { EmptyState } from "../components/ui/empty-state.tsx";
-import { api, ApiError } from "../lib/api.ts";
+import { ApiError } from "../lib/api.ts";
+import { documentsApi } from "../lib/documents-api.ts";
 import { formatBytes, formatDateTime, formatPages } from "../lib/format.ts";
-import { keys, refreshAll, useSignedIn } from "../lib/queries.ts";
+import { keys, refreshAll } from "../lib/queries.ts";
 
 export function TrashRoute() {
-  const signedIn = useSignedIn();
   return (
     <Page title="Trash" lede="Documents you deleted. Restore one to put it back where it was.">
-      {signedIn === false && <SignedOut />}
-      {signedIn === true && <TrashList />}
+      <TrashList />
     </Page>
   );
 }
 
 function TrashList() {
-  const trash = useQuery({ queryKey: keys.trash, queryFn: api.trash });
-  const restore = useMutation({ mutationFn: api.restoreDocument, onSuccess: refreshAll });
+  const trash = useQuery({ queryKey: keys.trash, queryFn: documentsApi.trash });
+  const restore = useMutation({ mutationFn: documentsApi.restoreDocument, onSuccess: refreshAll });
   const docs = trash.data ?? [];
 
   return (

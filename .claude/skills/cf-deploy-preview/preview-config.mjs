@@ -51,7 +51,8 @@ config.r2_buckets = config.r2_buckets.map((b) =>
 config.kv_namespaces = config.kv_namespaces.map((k) =>
   k.binding === "KV" ? { ...k, id: kvId } : k,
 );
-if (!production) config.vars = { ...config.vars, TEST_HOOKS: "enabled" };
+// Previews never send real mail: it lands in the Outbox (Q5).
+if (!production) config.vars = { ...config.vars, TEST_HOOKS: "enabled", EMAIL_PROVIDER: "outbox" };
 
 const out = join(apiDir, production ? "wrangler.production.json" : "wrangler.preview.json");
 writeFileSync(out, `${JSON.stringify(config, null, 2)}\n`);

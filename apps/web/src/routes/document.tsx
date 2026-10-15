@@ -5,16 +5,16 @@ import { Link, useNavigate, useParams } from "react-router";
 
 import { Page } from "../components/page.tsx";
 import { PageCanvas, usePdf } from "../components/pdf-pages.tsx";
-import { SignedOut } from "../components/signed-out.tsx";
 import { Badge } from "../components/ui/badge.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Field } from "../components/ui/field.tsx";
 import { Sheet, SheetBody, SheetHeader, SheetTitle } from "../components/ui/sheet.tsx";
 import { UploadButton, UploadStatus, useUpload } from "../components/upload.tsx";
-import { api, ApiError } from "../lib/api.ts";
+import { ApiError } from "../lib/api.ts";
+import { documentsApi } from "../lib/documents-api.ts";
 import { folderChoices, folderPath } from "../lib/folders.ts";
 import { formatBytes, formatDateTime, formatPages } from "../lib/format.ts";
-import { keys, refreshAll, useFolders, useSignedIn } from "../lib/queries.ts";
+import { keys, refreshAll, useFolders } from "../lib/queries.ts";
 
 /** Saves fetched bytes, so a download carries the same credentials as every API call. */
 function saveFile(blob: Blob, filename: string) {
@@ -34,20 +34,11 @@ function errorText(err: unknown): string {
 
 export function DocumentRoute() {
   const { id = "" } = useParams();
-  const signedIn = useSignedIn();
   const document = useQuery({
     queryKey: keys.document(id),
-    queryFn: () => api.document(id),
-    enabled: signedIn === true,
+    queryFn: () => documentsApi.document(id),
   });
 
-  if (signedIn === false) {
-    return (
-      <Page title="Document">
-        <SignedOut />
-      </Page>
-    );
-  }
   if (document.isError) {
     return (
       <Page title="Document not found">
@@ -65,7 +56,7 @@ export function DocumentRoute() {
 function Viewer({ doc }: { readonly doc: DocumentInfo }) {
   const content = useQuery({
     queryKey: keys.content(doc.id, doc.currentVersion),
-    queryFn: () => api.content(doc.id),
+    queryFn: () => documentsApi.content(doc.id),
     staleTime: Infinity,
   });
   const { pdf, error } = usePdf(content.data);
@@ -146,7 +137,8 @@ function Actions({ doc }: { readonly doc: DocumentInfo }) {
   const navigate = useNavigate();
   const trashed = doc.deletedAt !== null;
   const trash = useMutation({
-    mutationFn: () => (trashed ? api.restoreDocument(doc.id) : api.trashDocument(doc.id)),
+    mutationFn: () =>
+      trashed ? documentsApi.restoreDocument(doc.id) : documentsApi.trashDocument(doc.id),
     onSuccess: async () => {
       await refreshAll();
       if (!trashed) await navigate(doc.folderId ? `/?folder=${doc.folderId}` : "/");
@@ -155,7 +147,7 @@ function Actions({ doc }: { readonly doc: DocumentInfo }) {
   const { state, upload } = useUpload({ documentId: doc.id });
   const download = useMutation({
     mutationFn: async () => {
-      const bytes = await api.content(doc.id);
+      const bytes = await documentsApi.content(doc.id);
       saveFile(new Blob([bytes], { type: "application/pdf" }), `${doc.title}.pdf`);
     },
   });
@@ -216,7 +208,7 @@ function Actions({ doc }: { readonly doc: DocumentInfo }) {
 function RenameForm({ doc }: { readonly doc: DocumentInfo }) {
   const [title, setTitle] = useState(doc.title);
   const rename = useMutation({
-    mutationFn: () => api.updateDocument(doc.id, { title: title.trim() }),
+    mutationFn: () => documentsApi.updateDocument(doc.id, { title: title.trim() }),
     onSuccess: refreshAll,
   });
   function submit(e: SyntheticEvent) {
@@ -246,7 +238,8 @@ function MoveForm({ doc }: { readonly doc: DocumentInfo }) {
   const folders = useFolders(true);
   const [target, setTarget] = useState(doc.folderId ?? "");
   const move = useMutation({
-    mutationFn: () => api.updateDocument(doc.id, { folderId: target === "" ? null : target }),
+    mutationFn: () =>
+      documentsApi.updateDocument(doc.id, { folderId: target === "" ? null : target }),
     onSuccess: refreshAll,
   });
   const choices = folderChoices(folders.data ?? []);
@@ -305,10 +298,10 @@ function MoveForm({ doc }: { readonly doc: DocumentInfo }) {
 function Versions({ doc }: { readonly doc: DocumentInfo }) {
   const versions = useQuery({
     queryKey: keys.versions(doc.id),
-    queryFn: () => api.versions(doc.id),
+    queryFn: () => documentsApi.versions(doc.id),
   });
   const restore = useMutation({
-    mutationFn: (n: number) => api.restoreVersion(doc.id, n),
+    mutationFn: (n: number) => documentsApi.restoreVersion(doc.id, n),
     onSuccess: refreshAll,
   });
   return (

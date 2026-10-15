@@ -1,4 +1,11 @@
-# Copy to .dev.vars (gitignored) to enable test hooks under `pnpm dev`.
-# Never set these in production config (Q11).
+# Copy to .dev.vars (gitignored) to enable test hooks and sign-in under `pnpm dev`.
+# Never set TEST_HOOKS in production config (Q11).
 TEST_HOOKS=enabled
 TEST_HOOKS_SECRET=change-me-to-a-long-random-string
+# Signs session cookies. Generate one with: openssl rand -hex 32
+BETTER_AUTH_SECRET=change-me-to-another-long-random-string
+# Sign-in codes and invitations land in the Outbox: GET /__test/outbox?to=<email>
+EMAIL_PROVIDER=outbox
+# Optional: set both to offer "Continue with Google" on /sign-in.
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=

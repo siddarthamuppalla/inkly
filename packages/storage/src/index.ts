@@ -1,9 +1,13 @@
 export type { StorageEnv } from "./env.ts";
 export { versionKey } from "./keys.ts";
-export { createTenant, getTenant, type TenantRow } from "./tenants.ts";
+export { getTenant, setTenantPlan, type Plan, type TenantRow } from "./tenants.ts";
 export { appendAccessLog, listAccessLog, type AccessLogRow } from "./access-log.ts";
-export { createSession, findSession, type SessionRow } from "./sessions.ts";
-export { createUser, getUser, type UserRow } from "./users.ts";
+export {
+  listMembers,
+  listPendingInvitations,
+  type InvitationRow,
+  type MemberRow,
+} from "./members.ts";
 export {
   addVersion,
   createDocument,

@@ -1,6 +1,7 @@
 import { QueryClient, useQuery } from "@tanstack/react-query";
 
-import { api, ApiError } from "./api.ts";
+import { ApiError } from "./api.ts";
+import { documentsApi } from "./documents-api.ts";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -13,7 +14,6 @@ export const queryClient = new QueryClient({
 });
 
 export const keys = {
-  session: ["session"] as const,
   documents: (folderId: string | null) => ["documents", folderId] as const,
   trash: ["trash"] as const,
   folders: ["folders"] as const,
@@ -27,12 +27,6 @@ export function refreshAll(): Promise<void> {
   return queryClient.invalidateQueries();
 }
 
-/** True or false once known; undefined while the session check is in flight. */
-export function useSignedIn(): boolean | undefined {
-  const { data } = useQuery({ queryKey: keys.session, queryFn: api.session });
-  return data?.signedIn;
-}
-
 export function useFolders(enabled: boolean) {
-  return useQuery({ queryKey: keys.folders, queryFn: api.folders, enabled });
+  return useQuery({ queryKey: keys.folders, queryFn: documentsApi.folders, enabled });
 }
