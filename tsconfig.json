@@ -8,6 +8,7 @@
     { "path": "packages/storage" },
     { "path": "packages/pdf" },
     { "path": "packages/auth" },
-    { "path": "packages/testing" }
+    { "path": "packages/testing" },
+    { "path": "containers/pdf-engine" }
   ]
 }
