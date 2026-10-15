@@ -15,6 +15,7 @@ All are jobs in `.github/workflows/ci.yml`:
 | `check` | `pnpm check` (tsc, eslint with boundaries, prettier) and `pnpm lint:fixtures` |
 | `test` | `pnpm test` (vitest, Workers pool, and the pdf-engine service tests with qpdf + Ghostscript) |
 | `verify-pdf` | `verify-pdf --corpus fixtures/pdfs` |
+| `verify-perf` | `verify-perf` (p95 ≤ 3 s, ≤ 20% regression vs `perf-baseline.json`) and `--self-test`. **Not yet in the required list below: a human adds it** once it has run green on a runner. |
 | `verify-app` | `verify-app --self-test` and `J-000` smoke |
 | `verify-tenancy` | `verify-tenancy` and `--self-test` |
 | `audit` | `pnpm audit --audit-level high` |

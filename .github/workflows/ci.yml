@@ -30,6 +30,14 @@ jobs:
       - uses: ./.github/actions/setup
         with: { pdf-tools: "true" }
       - run: .claude/skills/verify-pdf/run.sh --corpus fixtures/pdfs
+  verify-perf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with: { pdf-tools: "true" }
+      - run: .claude/skills/verify-perf/run.sh
+      - run: .claude/skills/verify-perf/run.sh --self-test
   verify-app:
     runs-on: ubuntu-latest
     steps:

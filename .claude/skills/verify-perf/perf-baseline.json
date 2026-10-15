@@ -1,0 +1,23 @@
+{
+  "generatedOn": "2026-10-15T23:30:25.896Z on linux, Intel(R) Xeon(R) Processor @ 2.10GHz x4",
+  "ops": {
+    "merge 50p+10p": {
+      "p95": 33.2
+    },
+    "split 50p into 5": {
+      "p95": 21.3
+    },
+    "rotate 50p all pages": {
+      "p95": 10.5
+    },
+    "reorder 50p reversed": {
+      "p95": 12.6
+    },
+    "compress 50p ebook": {
+      "p95": 288.4
+    },
+    "compress huge-image ebook": {
+      "p95": 1729.6
+    }
+  }
+}
