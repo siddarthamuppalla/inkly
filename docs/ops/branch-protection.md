@@ -23,7 +23,9 @@ All are jobs in `.github/workflows/ci.yml`:
 | `secrets` | gitleaks |
 
 `preview` is deliberately not required: it skips when the Cloudflare secrets are
-absent, and fork PRs never get it.
+absent, and fork PRs never get it. `verifier` (T1.7) is not required either: it
+skips on drafts and until `CLAUDE_CODE_OAUTH_TOKEN` is set, and it stops while any
+open issue carries `factory-pause` or the repo variable `FACTORY_PAUSED` is `true`.
 
 ## Apply it
 With the GitHub CLI signed in as a repo admin:
