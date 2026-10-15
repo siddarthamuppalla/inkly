@@ -87,20 +87,21 @@ workers_dev_url() {
   printf 'https://%s.%s.workers.dev' "$1" "$subdomain"
 }
 
-# wait_healthy URL: returns once URL/health has answered 200 five times in a row.
+# wait_healthy URL: returns once URL/health has answered 200 ten times in a row.
 wait_healthy() {
   local url="$1"
   # A new workers.dev route reaches Cloudflare's edge unevenly: one 200 can be followed
   # by a 404 from a machine that hasn't seen the Worker yet (seen on the first deploy of
-  # PR #22). Wait for several 200s in a row before handing the URL to the verifiers.
+  # PR #22, and again after five 200s on PR #34). Wait for ten 200s in a row, about 20
+  # seconds, before handing the URL to the verifiers.
   local status="" streak=0
-  for _ in $(seq 1 60); do
+  for _ in $(seq 1 90); do
     status="$(curl -s -o /dev/null -w '%{http_code}' "$url/health" || true)"
     if [ "$status" = "200" ]; then streak=$((streak + 1)); else streak=0; fi
-    [ "$streak" -ge 5 ] && break
+    [ "$streak" -ge 10 ] && break
     sleep 2
   done
-  [ "$streak" -ge 5 ] || die "$url/health not stable after deploy (last status $status)"
+  [ "$streak" -ge 10 ] || die "$url/health not stable after deploy (last status $status)"
 }
 
 # ensure_random_secret CONFIG NAME: sets Worker secret NAME to random hex unless it already
