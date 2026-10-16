@@ -14,7 +14,7 @@ journey, and `summary.md`. Paste the summary path into the PR's Verification Evi
 - When adding a feature: add its row to `feature-map.md` and its automation to
   `packages/testing/src/app/journeys.ts` under the same ID, then run it.
 - After changing this skill: run `--self-test`.
-- CI runs `--self-test`, `J-000`, `J-001`, `J-002`, `J-003`, `J-004`, `J-005` and `J-008` on every PR.
+- CI runs `--self-test`, `J-000`, `J-001`, `J-002`, `J-003`, `J-004`, `J-005`, `J-008` and `J-009` on every PR.
 - Journeys that need a signed-in user call `signedIn(ctx)` from `src/app/sign-in.ts`: it seeds a
   Tenant and owner through `/__test/seed` and sends `Authorization: Bearer <token>` on
   every later request from the page. It needs the test-hooks secret.
@@ -56,6 +56,7 @@ Exit codes: `0` pass, `1` a journey or check failed, `2` bad arguments or an unk
 Run `pnpm i` first. Chromium is installed with
 `pnpm --filter @inkly/testing exec playwright install --with-deps chromium`.
 Alternatively, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to an existing Chromium binary.
+J-009 also runs verify-pdf on the Versions it saves, so it needs qpdf and poppler-utils.
 
 ## Test hooks under `pnpm dev`
 Copy `workers/api/.dev.vars.example` to `workers/api/.dev.vars` (it is gitignored) to

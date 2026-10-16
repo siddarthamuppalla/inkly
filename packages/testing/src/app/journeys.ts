@@ -1,6 +1,7 @@
 import type { Locator, Page } from "playwright";
 
 import { DOCUMENT_JOURNEYS } from "./documents.ts";
+import { J009 } from "./forms.ts";
 import { signedIn } from "./sign-in.ts";
 
 export interface JourneyContext {
@@ -289,5 +290,5 @@ const J008: Journey = {
 };
 
 export const JOURNEYS: ReadonlyMap<string, Journey> = new Map(
-  [J000, J001, J002, ...DOCUMENT_JOURNEYS, J008, JFAIL].map((j) => [j.id, j]),
+  [J000, J001, J002, ...DOCUMENT_JOURNEYS, J008, J009, JFAIL].map((j) => [j.id, j]),
 );

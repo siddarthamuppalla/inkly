@@ -6,12 +6,12 @@ import type { Journey, JourneyContext } from "./journeys.ts";
 import { signedIn } from "./sign-in.ts";
 
 const FIXTURES = join(import.meta.dirname, "../../../../fixtures/pdfs");
-const fixture = (name: string) => join(FIXTURES, name);
+export const fixture = (name: string) => join(FIXTURES, name);
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
-const WAIT = { timeout: 20_000 };
+export const WAIT = { timeout: 20_000 };
 
 /** Waits for a condition the page should reach, recording a failure instead of throwing. */
-async function reach(ctx: JourneyContext, wait: Promise<unknown>, message: string) {
+export async function reach(ctx: JourneyContext, wait: Promise<unknown>, message: string) {
   const ok = await wait.then(
     () => true,
     () => false,
@@ -21,7 +21,7 @@ async function reach(ctx: JourneyContext, wait: Promise<unknown>, message: strin
 }
 
 /** Uploads a fixture from the Documents page and waits for its row. */
-async function uploadFromList(ctx: JourneyContext, name: string) {
+export async function uploadFromList(ctx: JourneyContext, name: string) {
   const { page } = ctx;
   await page.getByTestId("upload-input").setInputFiles(fixture(name));
   const title = name.replace(/\.pdf$/, "");
@@ -32,7 +32,7 @@ async function uploadFromList(ctx: JourneyContext, name: string) {
   );
 }
 
-async function openDocuments(ctx: JourneyContext) {
+export async function openDocuments(ctx: JourneyContext) {
   await ctx.page.goto(new URL("/", ctx.baseUrl).toString());
   await reach(
     ctx,
@@ -41,7 +41,7 @@ async function openDocuments(ctx: JourneyContext) {
   );
 }
 
-async function pagesRendered(ctx: JourneyContext, pages: number) {
+export async function pagesRendered(ctx: JourneyContext, pages: number) {
   const { page } = ctx;
   await reach(
     ctx,
