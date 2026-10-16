@@ -1,6 +1,6 @@
 import type { Locator, Page } from "playwright";
 
-import { DOCUMENT_JOURNEYS, openDocuments, uploadFromList, WAIT } from "./documents.ts";
+import { DOCUMENT_JOURNEYS, openDocuments, reach, uploadFromList, WAIT } from "./documents.ts";
 import { PAGE_OP_JOURNEYS } from "./page-ops.ts";
 import { signedIn } from "./sign-in.ts";
 
@@ -335,12 +335,15 @@ const J015: Journey = {
     );
 
     const workspace = page.getByRole("combobox", { name: "Workspace" });
+    // Switching reloads the page once the API answers; read /api/me only after that reload.
+    const reloaded = page.waitForEvent("framenavigated", {
+      predicate: (f) => f === page.mainFrame(),
+      ...WAIT,
+    });
     await workspace.selectOption(member.tenantId);
-    let switched = await apiMe(ctx);
-    for (let i = 0; i < 20 && switched.body.activeTenant?.id !== member.tenantId; i++) {
-      await page.waitForTimeout(500);
-      switched = await apiMe(ctx);
-    }
+    await reach(ctx, reloaded, "the page did not reload after switching workspace");
+    await page.waitForLoadState("load");
+    const switched = await apiMe(ctx);
     expect(
       switched.body.activeTenant?.id === member.tenantId && switched.body.role === "owner",
       `after switching, Active tenant is ${String(switched.body.activeTenant?.id)} as ${String(switched.body.role)}, expected ${member.tenantId} as owner`,
