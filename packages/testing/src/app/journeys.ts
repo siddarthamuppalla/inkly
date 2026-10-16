@@ -1,6 +1,6 @@
 import type { Locator, Page } from "playwright";
 
-import { DOCUMENT_JOURNEYS } from "./documents.ts";
+import { DOCUMENT_JOURNEYS, WAIT } from "./documents.ts";
 import { PAGE_OP_JOURNEYS } from "./page-ops.ts";
 import { signedIn } from "./sign-in.ts";
 
@@ -346,16 +346,25 @@ const J015: Journey = {
     const members = page.getByTestId("member-list");
     expect(await visible(members.getByText(invitee)), "the invitee is not listed as a member");
     await members.getByRole("button", { name: `Remove ${invitee}` }).click();
+    // A real deploy can take longer than `visible`'s 10 s to remove a member.
+    const removed = page.getByRole("status").getByText(`${invitee} was removed.`);
     expect(
-      await visible(page.getByRole("status").getByText(`${invitee} was removed.`)),
+      await removed.waitFor(WAIT).then(
+        () => true,
+        () => false,
+      ),
       "no confirmation after removing the member",
     );
+    // One row per member; the email also sits in its Remove button's label.
     expect(
       await members
-        .getByText(invitee)
-        .waitFor({ state: "detached", timeout: 10_000 })
-        .then(() => true)
-        .catch(() => false),
+        .getByRole("listitem")
+        .filter({ hasText: invitee })
+        .waitFor({ ...WAIT, state: "detached" })
+        .then(
+          () => true,
+          () => false,
+        ),
       "the removed member is still listed",
     );
     await checkpoint("removed");
