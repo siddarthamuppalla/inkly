@@ -137,14 +137,11 @@ function fillable(doc: PDFDocument): { field: PDFField; kind: Kind }[] {
     });
 }
 
+const NO_RECT: FieldRect = { x: 0, y: 0, width: 0, height: 0 };
+
 function common(doc: PDFDocument, field: PDFField, pages: Map<PDFRef, number>): Common {
   const widget = field.acroField.getWidgets()[0];
-  const { x, y, width, height }: FieldRect = widget?.getRectangle() ?? {
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0,
-  };
+  const { x, y, width, height } = widget?.getRectangle() ?? NO_RECT;
   const ref = widget ? doc.context.getObjectRef(widget.dict) : undefined;
   return {
     name: field.getName(),
