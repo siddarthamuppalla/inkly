@@ -62,8 +62,18 @@ async function parse(input: Uint8Array): Promise<PDFDocument> {
   } catch (e) {
     throw new AppError("pdf_malformed", e instanceof Error ? e.message : "PDF could not be parsed");
   }
-  if (!streamsHaveLength(doc)) throw new AppError("pdf_malformed", "a stream has no /Length");
-  if (doc.getPageCount() === 0) throw new AppError("pdf_malformed", "PDF has no pages");
+  // pdf-lib reads objects lazily, so a broken page tree surfaces here rather than in load().
+  let pages: number;
+  try {
+    if (!streamsHaveLength(doc)) throw new AppError("pdf_malformed", "a stream has no /Length");
+    pages = doc.getPageCount();
+  } catch (e) {
+    if (e instanceof AppError) throw e;
+    // pdf-lib cannot decrypt, so encrypted object streams hide the page tree.
+    if (doc.isEncrypted) throw new AppError("pdf_encrypted", "PDF is encrypted");
+    throw new AppError("pdf_malformed", e instanceof Error ? e.message : "PDF could not be read");
+  }
+  if (pages === 0) throw new AppError("pdf_malformed", "PDF has no pages");
   return doc;
 }
 
@@ -78,9 +88,14 @@ export async function load(input: Uint8Array): Promise<PDFDocument> {
 /** Reads what upload validation needs. Encrypted input is reported, not refused. */
 export async function inspect(input: Uint8Array): Promise<PdfInspection> {
   const doc = await parse(input);
-  return {
-    pages: doc.getPageCount(),
-    encrypted: doc.isEncrypted,
-    sizes: doc.getPages().map((page) => page.getSize()),
-  };
+  try {
+    return {
+      pages: doc.getPageCount(),
+      encrypted: doc.isEncrypted,
+      sizes: doc.getPages().map((page) => page.getSize()),
+    };
+  } catch (e) {
+    if (doc.isEncrypted) throw new AppError("pdf_encrypted", "PDF is encrypted");
+    throw new AppError("pdf_malformed", e instanceof Error ? e.message : "PDF could not be read");
+  }
 }
