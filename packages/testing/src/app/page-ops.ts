@@ -35,6 +35,12 @@ const J006: Journey = {
     await page.getByRole("button", { name: "Save order" }).click();
     await reach(ctx, versions.nth(2).waitFor(WAIT), "Save order did not add Version 3");
     await pagesRendered(ctx, 10);
+    // The panel remounts once the Document (not just its Version list) has refetched.
+    await reach(
+      ctx,
+      page.getByTestId("edit-page").nth(9).filter({ hasText: "Page 10" }).waitFor(WAIT),
+      "the page list did not reset after Save order",
+    );
     const order = await page.getByTestId("edit-page").allTextContents();
     expect(
       order.length === 10 && order.every((text, i) => text.includes(`Page ${String(i + 1)}`)),
