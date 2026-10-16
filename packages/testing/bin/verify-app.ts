@@ -6,11 +6,13 @@ import { parseArgs } from "node:util";
 import { featureMapIds } from "../src/app/feature-map.ts";
 import { JOURNEYS, type Journey } from "../src/app/journeys.ts";
 import { startLocalWorker, type LocalWorker } from "../src/app/local-server.ts";
+import { routeCoverage, type ApiRoute, type RouteCoverage } from "../src/app/route-coverage.ts";
 import { runJourneys, writeSummary, type JourneyResult } from "../src/app/runner.ts";
 import { startFixtureServer, type FixtureMode } from "../src/app/self-test-server.ts";
 
 const USAGE = `usage:
   verify-app <J-ID>... [--url URL] [--secret SECRET] [--out DIR]
+  verify-app --all [--url URL] [--secret SECRET] [--out DIR]
   verify-app --self-test [--out DIR]`;
 
 const repoRoot = resolve(import.meta.dirname, "../../..");
@@ -51,12 +53,22 @@ async function seedChecks(
   return { notes, failures };
 }
 
+/** The Worker's routes, from the secret-gated `GET /__test/routes`. */
+async function apiRoutes(baseUrl: string, secret: string): Promise<ApiRoute[]> {
+  const res = await fetch(new URL("/__test/routes", baseUrl), {
+    headers: { "x-test-hooks-secret": secret },
+  });
+  if (res.status !== 200) throw new Error(`GET /__test/routes returned ${String(res.status)}`);
+  return ((await res.json()) as { routes: ApiRoute[] }).routes;
+}
+
 async function verify(
   ids: string[],
   url: string | undefined,
   secretArg: string | undefined,
   out: string,
   featureMap: string,
+  coverage: boolean,
 ) {
   const listed = new Set(featureMapIds(featureMap));
   const journeys: Journey[] = [];
@@ -90,17 +102,37 @@ async function verify(
     const seed = await seedChecks(baseUrl, secret);
     const results = await runJourneys(journeys, baseUrl, outDir, secret);
     const all: JourneyResult[] = results;
-    const notes = [...seed.notes, ...seed.failures.map((f) => `❌ ${f}`)];
+    const failures = [...seed.failures];
+    let covered: RouteCoverage[] | undefined;
+    if (coverage) {
+      if (secret === undefined) {
+        failures.push("--all needs the test-hooks secret to read the API's routes");
+      } else {
+        covered = routeCoverage(
+          await apiRoutes(baseUrl, secret),
+          new Map(all.map((r) => [r.id, r.requests])),
+        );
+        for (const c of covered.filter((c) => c.hits === 0)) {
+          failures.push(
+            `no journey made a successful ${c.route.method} ${c.route.path}: add one to feature-map.md`,
+          );
+        }
+      }
+    }
+    const notes = [...seed.notes, ...failures.map((f) => `❌ ${f}`)];
     if (url === undefined) notes.push("Server: local `wrangler dev` started by verify-app");
-    const summary = writeSummary({ runId, baseUrl, outDir, notes }, all);
+    const summary = writeSummary(
+      { runId, baseUrl, outDir, notes, ...(covered && { coverage: covered }) },
+      all,
+    );
     if (log.length > 0) writeFileSync(join(outDir, "wrangler.log"), log.join(""));
-    const ok = seed.failures.length === 0 && all.every((r) => r.ok);
+    const ok = failures.length === 0 && all.every((r) => r.ok);
     for (const r of all) {
       console.log(
         `${r.ok ? "PASS" : "FAIL"} ${r.id} ${r.title}${r.ok ? "" : `: ${r.failures.join("; ")}`}`,
       );
     }
-    for (const f of seed.failures) console.log(`FAIL ${f}`);
+    for (const f of failures) console.log(`FAIL ${f}`);
     console.log(`artifacts: ${relative(process.cwd(), outDir) || "."}`);
     console.log(`summary: ${relative(process.cwd(), summary)}`);
     console.log(ok ? "verify-app: PASS" : "verify-app: FAIL");
@@ -159,6 +191,7 @@ async function main(): Promise<number> {
       secret: { type: "string" },
       out: { type: "string" },
       "self-test": { type: "boolean" },
+      all: { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -168,12 +201,26 @@ async function main(): Promise<number> {
   }
   const out = resolve(values.out ?? join(repoRoot, "artifacts/verify-app"));
   if (values["self-test"] === true) return selfTest(out);
-  if (positionals.length === 0) {
+  const all = values.all === true;
+  if (all === positionals.length > 0) {
     console.error(USAGE);
     return 2;
   }
   const secret = values.secret ?? process.env["TEST_HOOKS_SECRET"];
-  return verify(positionals, values.url, secret, out, featureMap);
+  const ids = all ? featureMapIds(featureMap) : positionals;
+  if (all) {
+    const listed = new Set(ids);
+    const unlisted = [...JOURNEYS.values()].filter(
+      (j) => j.selfTestOnly !== true && !listed.has(j.id),
+    );
+    if (unlisted.length > 0) {
+      console.error(
+        `journeys with no row in feature-map.md: ${unlisted.map((j) => j.id).join(", ")}`,
+      );
+      return 2;
+    }
+  }
+  return verify(ids, values.url, secret, out, featureMap, all);
 }
 
 main().then(

@@ -216,6 +216,14 @@ const J002: Journey = {
       `Active tenant is ${String(me.activeTenant?.name)}, expected ${name}'s workspace`,
     );
     expect(me.role === "owner", `role is ${String(me.role)}, expected owner`);
+    // Backend: Better-Auth's own session endpoint reads the cookie the code sign-in set.
+    const session = await page.evaluate<{ user?: { email?: string } } | null>(
+      "fetch('/api/auth/get-session').then((r) => r.json()).catch(() => null)",
+    );
+    expect(
+      session?.user?.email === email,
+      `GET /api/auth/get-session user is ${String(session?.user?.email)}`,
+    );
     const workspace = page.getByTestId("user-menu").getByLabel("Workspace");
     expect(
       (await workspace.locator("option:checked").textContent()) === `${name}'s workspace`,
@@ -289,6 +297,74 @@ const J008: Journey = {
   },
 };
 
+const J015: Journey = {
+  id: "J-015",
+  title: "Switch workspace and remove a member",
+  async run(ctx) {
+    const { page, baseUrl, expect, checkpoint } = ctx;
+    const owner = await signedIn(ctx, { plan: "pro" });
+    await page.goto(new URL("/members", baseUrl).toString());
+    const invitee = uniqueEmail("j015");
+    await page.getByLabel("Email").fill(invitee);
+    await page.getByRole("button", { name: "Send invitation" }).click();
+    expect(
+      await visible(page.getByRole("status").getByText(`Invitation sent to ${invitee}.`)),
+      "no confirmation after sending the invitation",
+    );
+    const link = /https?:\/\/\S+\/invitations\/\S+/.exec(await latestMail(ctx, invitee))?.[0];
+    expect(link !== undefined, `no invitation link in the Outbox for ${invitee}`);
+
+    const member = await signedIn(ctx, { email: invitee });
+    await page.goto(new URL(new URL(link ?? "/", baseUrl).pathname, baseUrl).toString());
+    await page.getByRole("button", { name: "Accept invitation" }).click();
+    await page.waitForURL(`${baseUrl}/`, { timeout: 10_000 }).catch(() => undefined);
+    const joined = await apiMe(ctx);
+    expect(
+      joined.body.activeTenant?.id === owner.tenantId,
+      `after accepting, Active tenant is ${String(joined.body.activeTenant?.id)}, expected ${owner.tenantId}`,
+    );
+
+    const workspace = page.getByRole("combobox", { name: "Workspace" });
+    await workspace.selectOption(member.tenantId);
+    let switched = await apiMe(ctx);
+    for (let i = 0; i < 20 && switched.body.activeTenant?.id !== member.tenantId; i++) {
+      await page.waitForTimeout(500);
+      switched = await apiMe(ctx);
+    }
+    expect(
+      switched.body.activeTenant?.id === member.tenantId && switched.body.role === "owner",
+      `after switching, Active tenant is ${String(switched.body.activeTenant?.id)} as ${String(switched.body.role)}, expected ${member.tenantId} as owner`,
+    );
+    expect(
+      (await workspace.inputValue().catch(() => "")) === member.tenantId,
+      "the Workspace menu does not show the workspace switched to",
+    );
+    await checkpoint("switched");
+
+    await page.setExtraHTTPHeaders({ authorization: `Bearer ${owner.token}` });
+    await page.goto(new URL("/members", baseUrl).toString());
+    const members = page.getByTestId("member-list");
+    expect(await visible(members.getByText(invitee)), "the invitee is not listed as a member");
+    await members.getByRole("button", { name: `Remove ${invitee}` }).click();
+    expect(
+      await visible(page.getByRole("status").getByText(`${invitee} was removed.`)),
+      "no confirmation after removing the member",
+    );
+    expect(
+      await members
+        .getByText(invitee)
+        .waitFor({ state: "detached", timeout: 10_000 })
+        .then(() => true)
+        .catch(() => false),
+      "the removed member is still listed",
+    );
+    await checkpoint("removed");
+  },
+};
+
 export const JOURNEYS: ReadonlyMap<string, Journey> = new Map(
-  [J000, J001, J002, ...DOCUMENT_JOURNEYS, ...PAGE_OP_JOURNEYS, J008, JFAIL].map((j) => [j.id, j]),
+  [J000, J001, J002, ...DOCUMENT_JOURNEYS, ...PAGE_OP_JOURNEYS, J008, J015, JFAIL].map((j) => [
+    j.id,
+    j,
+  ]),
 );
