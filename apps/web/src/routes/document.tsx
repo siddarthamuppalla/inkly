@@ -3,6 +3,9 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, type SyntheticEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
+import { AnnotationLayer } from "../components/annotations/annotation-layer.tsx";
+import { CommentsPanel } from "../components/annotations/comments-panel.tsx";
+import { AnnotationsProvider } from "../components/annotations/context.tsx";
 import { Page } from "../components/page.tsx";
 import { PageCanvas, usePdf } from "../components/pdf-pages.tsx";
 import { Badge } from "../components/ui/badge.tsx";
@@ -50,7 +53,11 @@ export function DocumentRoute() {
     );
   }
   if (!document.data) return <Page title="Document">{null}</Page>;
-  return <Viewer doc={document.data} />;
+  return (
+    <AnnotationsProvider doc={document.data}>
+      <Viewer doc={document.data} />
+    </AnnotationsProvider>
+  );
 }
 
 function Viewer({ doc }: { readonly doc: DocumentInfo }) {
@@ -71,6 +78,7 @@ function Viewer({ doc }: { readonly doc: DocumentInfo }) {
           className="flex flex-col gap-6 md:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1"
         >
           <Actions doc={doc} />
+          <CommentsPanel />
           <Versions doc={doc} />
         </aside>
         <nav aria-label="Page thumbnails" className="hidden md:block xl:col-start-1 xl:row-start-1">
@@ -114,14 +122,17 @@ function Viewer({ doc }: { readonly doc: DocumentInfo }) {
           {pdf &&
             pages.map((n) => (
               <figure key={n} id={`page-${String(n)}`} className="flex flex-col gap-2">
-                <PageCanvas
-                  pdf={pdf}
-                  pageNumber={n}
-                  width={800}
-                  label={`Page ${String(n)} of ${String(pages.length)}`}
-                  testId="page"
-                  className="h-auto w-full max-w-[800px] border bg-card shadow-sheet"
-                />
+                <div className="relative w-full max-w-[800px]">
+                  <PageCanvas
+                    pdf={pdf}
+                    pageNumber={n}
+                    width={800}
+                    label={`Page ${String(n)} of ${String(pages.length)}`}
+                    testId="page"
+                    className="block h-auto w-full border bg-card shadow-sheet"
+                  />
+                  <AnnotationLayer page={n} />
+                </div>
                 <figcaption className="text-sm text-muted-foreground">
                   Page {n} of {pages.length}
                 </figcaption>
