@@ -14,7 +14,9 @@ its own folder and Document. Then A tries to reach B's data every known way:
 - by listing B's Documents, folder contents and folders;
 - by fetching B's content and Version content (the R2 objects);
 - by listing, adding and restoring B's Versions;
-- by uploading into, nesting under, renaming, moving into and deleting B's folder.
+- by uploading into, nesting under, renaming, moving into and deleting B's folder;
+- by sharing B's Document, listing B's Share links and revoking B's link; and it checks
+  that A's link token serves A's Document only, whatever tenant or Document the request names.
 
 Pass means every attempt returned 403 or 404. A's access log must hold exactly one
 denial entry per denied attempt, and B's Documents and folders must be unchanged.
@@ -46,6 +48,7 @@ It prints a table of attempts with their statuses. Exit codes: `0` pass, `1` a l
 or check failure. For `--self-test`, `0` means the leak was caught.
 
 ## What it attacks today
-`/api/documents` (`workers/api/src/documents.ts`) and `/api/folders`
-(`workers/api/src/folders.ts`). Add cases to `attack.ts` when a new tenant-scoped
+`/api/documents` (`workers/api/src/documents.ts`), `/api/folders`
+(`workers/api/src/folders.ts`), and `/api/share-links` and `/api/share/:token`
+(`workers/api/src/share-links.ts`). Add cases to `attack.ts` when a new tenant-scoped
 route ships.

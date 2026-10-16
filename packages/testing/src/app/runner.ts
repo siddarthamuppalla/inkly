@@ -52,7 +52,10 @@ function isExpectedClientError(journey: Journey, text: string, url: string): boo
   const status = Number(RESOURCE_STATUS.exec(text)?.[1]);
   if (!status) return false;
   const path = URL.canParse(url) ? new URL(url).pathname : "";
-  return (journey.expectedClientErrors ?? []).some((e) => e.status === status && e.path === path);
+  return (journey.expectedClientErrors ?? []).some(
+    (e) =>
+      e.status === status && (typeof e.path === "string" ? e.path === path : e.path.test(path)),
+  );
 }
 
 export async function runJourneys(
