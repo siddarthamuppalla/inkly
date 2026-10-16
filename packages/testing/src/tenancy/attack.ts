@@ -135,6 +135,16 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     problems.push("control: A's two content reads did not leave two access-log entries");
   }
 
+  /** Documents `who` has at the top level plus in `folder`: where a merge or split would land. */
+  const countDocs = async (who: Seeded, folder: string) => {
+    let n = 0;
+    for (const q of ["", `?folderId=${folder}`]) {
+      const res = await call(baseUrl, who, "GET", `/api/documents${q}`);
+      n += ((await res.json()) as { documents?: unknown[] }).documents?.length ?? 0;
+    }
+    return n;
+  };
+  const docsBefore = { a: await countDocs(a, folderA), b: await countDocs(b, folderB) };
   const asB = { "x-inkly-tenant": b.tenantId };
   const d = `/api/documents/${docB.id}`;
   const plan: { name: string; method: string; path: string; init?: RequestInit }[] = [
@@ -198,6 +208,40 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     { name: "fetch B's Version 1 content", method: "GET", path: `${d}/versions/1/content` },
     { name: "add a Version to B's Document", method: "POST", path: `${d}/versions`, init: pdf },
     { name: "restore B's Version 1", method: "POST", path: `${d}/versions/1/restore` },
+    {
+      name: "rotate B's pages",
+      method: "POST",
+      path: `${d}/rotate`,
+      init: json({ pages: [1], degrees: 90 }),
+    },
+    { name: "reorder B's pages", method: "POST", path: `${d}/reorder`, init: json({ order: [1] }) },
+    {
+      name: "delete B's pages",
+      method: "POST",
+      path: `${d}/delete-pages`,
+      init: json({ pages: [1] }),
+    },
+    {
+      name: "split B's Document",
+      method: "POST",
+      path: `${d}/split`,
+      init: json({ ranges: [{ from: 1, to: 1 }] }),
+    },
+    {
+      name: "merge B's Document into A's",
+      method: "POST",
+      path: "/api/documents/merge",
+      init: json({ documentIds: [docA.id, docB.id] }),
+    },
+    {
+      name: "merge claiming B's tenant",
+      method: "POST",
+      path: "/api/documents/merge",
+      init: {
+        ...json({ documentIds: [docB.id, docB.id] }),
+        headers: { "content-type": "application/json", ...asB },
+      },
+    },
     {
       name: "upload into B's folder",
       method: "POST",
@@ -292,6 +336,13 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
   };
   if ((listAfter.documents ?? []).some((d) => d.id === docB.id)) {
     problems.push("A's list includes B's Document after the switch attempt");
+  }
+
+  const docsAfter = { a: await countDocs(a, folderA), b: await countDocs(b, folderB) };
+  if (docsAfter.a !== docsBefore.a || docsAfter.b !== docsBefore.b) {
+    problems.push(
+      `Document counts changed (A ${String(docsBefore.a)}→${String(docsAfter.a)}, B ${String(docsBefore.b)}→${String(docsAfter.b)})`,
+    );
   }
 
   const deniedEntries = (await logOf()).filter((e) => e.status === 403 || e.status === 404).length;

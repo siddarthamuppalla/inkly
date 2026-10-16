@@ -82,16 +82,26 @@ async function currentBytes(c: TenantContext, doc: DocumentRow): Promise<Uint8Ar
   return new Uint8Array(await new Response(opened.object.body).arrayBuffer());
 }
 
-/** Runs `op` as one counted page op: claimed first, given back when `op` throws. */
-async function countedOp<T>(tenantId: TenantId, env: Env, op: () => Promise<T>): Promise<T> {
+/**
+ * Runs `op` as one counted page op: claimed first, given back when `op` throws before it
+ * stored anything. Once `op` calls `stored`, the op stays counted even if a later write fails.
+ */
+export async function countedOp<T>(
+  tenantId: TenantId,
+  env: Env,
+  op: (stored: () => void) => Promise<T>,
+): Promise<T> {
   const plan = await tenantPlan(tenantId, env);
   if (!(await claimPageOp(tenantId, env, PLAN_LIMITS[plan].pageOps))) {
     throw pageOpLimitError(plan);
   }
+  const progress = { stored: false };
   try {
-    return await op();
+    return await op(() => {
+      progress.stored = true;
+    });
   } catch (err) {
-    await releasePageOp(tenantId, env);
+    if (!progress.stored) await releasePageOp(tenantId, env);
     throw err;
   }
 }
@@ -125,6 +135,7 @@ async function storeNewDocuments(
   c: TenantContext,
   like: DocumentRow,
   outputs: readonly { title: string; body: Uint8Array }[],
+  stored: () => void,
 ): Promise<DocumentRow[]> {
   const tenantId = c.get("tenantId");
   await assertStorageFor(
@@ -142,6 +153,7 @@ async function storeNewDocuments(
         await newVersion(c, body),
       ),
     );
+    stored();
   }
   return created;
 }
@@ -171,7 +183,7 @@ pageOpRoutes.post("/merge", async (c) => {
     docs.reduce((sum, d) => sum + d.pages, 0),
   );
   const tenantId = c.get("tenantId");
-  const [document] = await countedOp(tenantId, c.env, async () => {
+  const [document] = await countedOp(tenantId, c.env, async (stored) => {
     const inputs: Uint8Array[] = [];
     for (const doc of docs) inputs.push(await currentBytes(c, doc));
     const title =
@@ -180,7 +192,7 @@ pageOpRoutes.post("/merge", async (c) => {
         .map((d) => d.title)
         .join(" + ")
         .slice(0, 200);
-    return storeNewDocuments(c, first, [{ title, body: await merge(inputs) }]);
+    return storeNewDocuments(c, first, [{ title, body: await merge(inputs) }], stored);
   });
   return c.json({ document }, 201);
 });
@@ -191,7 +203,7 @@ pageOpRoutes.post("/:id/split", async (c) => {
   if (!doc) return denyAccess(c, "write", `${c.req.method} ${c.req.path}`, 404);
   assertWorkerSized(doc.bytes, doc.pages);
   const ranges = req.ranges.map((r) => ({ from: pageNumber(r.from), to: pageNumber(r.to) }));
-  const documents = await countedOp(c.get("tenantId"), c.env, async () => {
+  const documents = await countedOp(c.get("tenantId"), c.env, async (stored) => {
     const parts = await split(await currentBytes(c, doc), ranges);
     return storeNewDocuments(
       c,
@@ -201,6 +213,7 @@ pageOpRoutes.post("/:id/split", async (c) => {
         const pages = from === to ? `p. ${String(from)}` : `pp. ${String(from)}-${String(to)}`;
         return { title: `${doc.title} (${pages})`.slice(0, 200), body };
       }),
+      stored,
     );
   });
   return c.json({ documents }, 201);

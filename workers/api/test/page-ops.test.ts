@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { onAppError } from "../src/errors.ts";
 import type { Env } from "../src/index.ts";
-import { pageOpRoutes } from "../src/page-ops.ts";
+import { countedOp, pageOpRoutes } from "../src/page-ops.ts";
 import type { TenantVars } from "../src/tenant-context.ts";
 import { accessLog, as, folder, hooks, json, seed, upload, uploaded } from "./helpers.ts";
 
@@ -132,9 +132,18 @@ describe("merge and split", () => {
     const theirs = await uploaded(b, "tiny.pdf");
     const res = await op(a, "/merge", { documentIds: [mine.id, theirs.id] });
     expect(res.status).toBe(404);
-    expect((await op(a, `/${theirs.id}/rotate`, { pages: [1], degrees: 90 })).status).toBe(404);
-    expect((await accessLog(a.tenantId)).filter((e) => e.status === 404)).toHaveLength(2);
-    expect((await as(b, `/api/documents/${theirs.id}`)).status).toBe(200);
+    const attempts = [
+      [`/${theirs.id}/rotate`, { pages: [1], degrees: 90 }],
+      [`/${theirs.id}/reorder`, { order: [1] }],
+      [`/${theirs.id}/delete-pages`, { pages: [1] }],
+      [`/${theirs.id}/split`, { ranges: [{ from: 1, to: 1 }] }],
+    ] as const;
+    for (const [path, req] of attempts) expect((await op(a, path, req)).status).toBe(404);
+    expect((await accessLog(a.tenantId)).filter((e) => e.status === 404)).toHaveLength(5);
+    const after = await as(b, `/api/documents/${theirs.id}`);
+    expect((await after.json<{ document: DocumentInfo }>()).document).toEqual(theirs);
+    const listed = await as(a, "/api/documents");
+    expect((await listed.json<{ documents: DocumentInfo[] }>()).documents).toHaveLength(1);
     expect((await getUsage(a.tenantId, env)).ops).toBe(0);
   });
 });
@@ -178,6 +187,21 @@ describe("limits", () => {
     );
     const res = await op(a, "/merge", { documentIds: await Promise.all(ids) });
     expect(res.status).toBe(413);
+  });
+});
+
+describe("counting", () => {
+  it("gives the op back when nothing was stored, and keeps it once something was", async () => {
+    const a = await seed();
+    const fail = () => Promise.reject(new Error("write failed"));
+    await expect(countedOp(a.tenantId, env, fail)).rejects.toThrow("write failed");
+    expect((await getUsage(a.tenantId, env)).ops).toBe(0);
+    const partial = (stored: () => void) => {
+      stored();
+      return fail();
+    };
+    await expect(countedOp(a.tenantId, env, partial)).rejects.toThrow("write failed");
+    expect((await getUsage(a.tenantId, env)).ops).toBe(1);
   });
 });
 

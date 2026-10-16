@@ -10,11 +10,11 @@ import { runJourneys, writeSummary, type JourneyResult } from "../src/app/runner
 import { startFixtureServer, type FixtureMode } from "../src/app/self-test-server.ts";
 
 const USAGE = `usage:
-  verify-app <J-ID>... [--url URL] [--secret SECRET] [--out DIR]
+  verify-app <J-ID>... [--url URL] [--secret SECRET] [--out DIR] [--feature-map FILE]
   verify-app --self-test [--out DIR]`;
 
 const repoRoot = resolve(import.meta.dirname, "../../..");
-const featureMap = join(repoRoot, ".claude/skills/verify-app/feature-map.md");
+const defaultFeatureMap = join(repoRoot, ".claude/skills/verify-app/feature-map.md");
 
 function newRunId(): string {
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
@@ -56,6 +56,7 @@ async function verify(
   url: string | undefined,
   secretArg: string | undefined,
   out: string,
+  featureMap: string,
 ) {
   const listed = new Set(featureMapIds(featureMap));
   const journeys: Journey[] = [];
@@ -64,7 +65,7 @@ async function verify(
     if (!listed.has(id) || !j || j.selfTestOnly === true) {
       console.error(
         !listed.has(id)
-          ? `${id} is not in .claude/skills/verify-app/feature-map.md`
+          ? `${id} is not in ${relative(repoRoot, featureMap)}`
           : `${id} has no automated journey in packages/testing/src/app/journeys.ts`,
       );
       return 2;
@@ -157,6 +158,7 @@ async function main(): Promise<number> {
       url: { type: "string" },
       secret: { type: "string" },
       out: { type: "string" },
+      "feature-map": { type: "string" },
       "self-test": { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
@@ -172,7 +174,8 @@ async function main(): Promise<number> {
     return 2;
   }
   const secret = values.secret ?? process.env["TEST_HOOKS_SECRET"];
-  return verify(positionals, values.url, secret, out);
+  const featureMap = resolve(values["feature-map"] ?? defaultFeatureMap);
+  return verify(positionals, values.url, secret, out, featureMap);
 }
 
 main().then(
