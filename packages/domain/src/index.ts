@@ -5,6 +5,7 @@ export {
   assertFileSizeAllowed,
   assertUploadAllowed,
   MiB,
+  pageOpLimitError,
   PLAN_LIMITS,
   type Plan,
   type PlanLimits,
@@ -24,3 +25,12 @@ export {
   VersionInfo,
   VersionListResponse,
 } from "./documents.ts";
+export {
+  DeletePagesRequest,
+  MergeRequest,
+  parseRanges,
+  ReorderRequest,
+  RotateRequest,
+  SplitRange,
+  SplitRequest,
+} from "./page-ops.ts";
