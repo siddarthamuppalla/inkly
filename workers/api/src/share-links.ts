@@ -152,11 +152,12 @@ sharedRoutes.get("/:token", async (c) => {
   const doc = await getDocument(link.tenantId, c.env, link.documentId);
   if (!doc) return c.json(GONE, 404);
   await logVisit(c, link, "read", 200);
+  if (!(await unlocked(c, link))) return c.json({ locked: true });
   return c.json({
+    locked: false,
     title: doc.title,
     pages: doc.pages,
     allowDownload: link.allowDownload,
-    locked: !(await unlocked(c, link)),
   });
 });
 

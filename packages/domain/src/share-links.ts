@@ -48,12 +48,14 @@ export const ShareLinkListResponse = z.object({ links: z.array(ShareLinkInfo) })
 export const ShareLinkCreatedResponse = z.object({ link: ShareLinkInfo, url: z.string() });
 export const ShareLinkResponse = z.object({ link: ShareLinkInfo });
 
-/** What a share-link visitor learns about the Document before (and after) unlocking. */
-export const SharedDocument = z.object({
-  title: z.string(),
-  pages: z.number().int(),
-  allowDownload: z.boolean(),
-  /** True while the link has a password and this browser has not unlocked it. */
-  locked: z.boolean(),
-});
+/** What a share-link visitor learns: nothing but "locked" until a password link is unlocked. */
+export const SharedDocument = z.discriminatedUnion("locked", [
+  z.object({ locked: z.literal(true) }),
+  z.object({
+    locked: z.literal(false),
+    title: z.string(),
+    pages: z.number().int(),
+    allowDownload: z.boolean(),
+  }),
+]);
 export type SharedDocument = z.infer<typeof SharedDocument>;

@@ -236,7 +236,7 @@ describe("a password link", () => {
 
   it("returns 401 for content until the right password is entered", async () => {
     const { token } = await locked();
-    expect(await (await visit(`/api/share/${token}`)).json()).toMatchObject({ locked: true });
+    expect(await (await visit(`/api/share/${token}`)).json()).toEqual({ locked: true });
     expect((await visit(`/api/share/${token}/content`)).status).toBe(401);
 
     const wrong = await unlock(token, "wrong horse");

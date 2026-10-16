@@ -15,6 +15,11 @@ import { TrashRoute } from "./routes/trash.tsx";
 export const router = createBrowserRouter([
   { path: "sign-in", Component: SignInRoute },
   {
+    path: "s/:token",
+    HydrateFallback: () => null,
+    lazy: async () => ({ Component: (await import("./routes/shared.tsx")).SharedRoute }),
+  },
+  {
     Component: AppShell,
     children: [
       { path: "design", Component: DesignRoute },
