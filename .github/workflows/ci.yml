@@ -3,6 +3,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # auto-merge.yml starts CI on main itself: its merges use the workflow token, which starts no push run.
+  workflow_dispatch:
 permissions:
   contents: read
 env:
@@ -45,7 +47,8 @@ jobs:
       - uses: ./.github/actions/setup
         with: { chromium: "true" }
       - run: .claude/skills/verify-app/run.sh --self-test
-      - run: .claude/skills/verify-app/run.sh J-000 J-001 J-002 J-003 J-004 J-005 J-006 J-008
+      # Every journey in feature-map.md, and a failure for any API route no journey reached.
+      - run: .claude/skills/verify-app/run.sh --all
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -85,6 +88,17 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc }
+      - run: node --test scripts/auto-merge.test.mjs
+      - name: actionlint (runs shellcheck on every run block)
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          ./actionlint -color
   # One PASS/FAIL comment per PR, updated in place on every push (T1.7, token-free).
   verdict:
     if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
@@ -99,6 +113,7 @@ jobs:
         audit,
         prod-config,
         secrets,
+        workflows,
       ]
     runs-on: ubuntu-latest
     permissions:
