@@ -32,3 +32,18 @@ export {
 } from "./folders.ts";
 export { getUsage, type UsageRow } from "./usage.ts";
 export { listTenantObjectKeys, MULTIPART_PART_BYTES } from "./versions.ts";
+export {
+  abandonJobCommit,
+  beginJobCommit,
+  completeJob,
+  createJob,
+  failJob,
+  findCommittedVersion,
+  getJob,
+  listDocumentJobs,
+  requeueJob,
+  startJobAttempt,
+  type CompressInput,
+  type JobRow,
+  type JobRowStatus,
+} from "./jobs.ts";

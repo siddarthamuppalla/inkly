@@ -46,6 +46,9 @@ check_pr() { [[ "${1:-}" =~ ^[0-9]+$ ]] || die "PR number required, got '${1:-}'
 d1_id() { cf GET "$acct/d1/database?name=$1&per_page=100" | jq -r --arg n "$1" '.result[] | select(.name == $n) | .uuid' | head -n1; }
 kv_id() { cf GET "$acct/storage/kv/namespaces?per_page=100" | jq -r --arg n "$1" '.result[] | select(.title == $n) | .id' | head -n1; }
 r2_exists() { cf GET "$acct/r2/buckets/$1" >/dev/null 2>&1; }
+queue_id() { cf GET "$acct/queues?per_page=100" | jq -r --arg n "$1" '.result[] | select(.queue_name == $n) | .queue_id' | head -n1; }
+# Container applications are named <worker>-<class>, e.g. inkly-pr-12-pdfengine.
+container_app_id() { cf GET "$acct/containers/applications" | jq -r --arg n "$1" '.result[]? | select(.name == $n) | .id' | head -n1; }
 worker_exists() { cf GET "$acct/workers/scripts" | jq -e --arg n "$1" '.result[] | select(.id == $n)' >/dev/null; }
 
 ensure_resources() {
@@ -74,6 +77,15 @@ ensure_resources() {
     echo "kv: reusing $name ($id)" >&2
   fi
   KV_ID="$id"
+
+  # The Job queue (T1.4b). The Worker is both its producer and its consumer.
+  id="$(queue_id "$name-jobs")"
+  if [ -z "$id" ]; then
+    cf POST "$acct/queues" "{\"queue_name\":\"$name-jobs\"}" >/dev/null
+    echo "queue: created $name-jobs" >&2
+  else
+    echo "queue: reusing $name-jobs" >&2
+  fi
 }
 
 

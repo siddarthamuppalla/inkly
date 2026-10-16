@@ -1,5 +1,6 @@
 import type { Locator, Page } from "playwright";
 
+import { COMPRESS_JOURNEYS } from "./compress.ts";
 import { DOCUMENT_JOURNEYS } from "./documents.ts";
 import { signedIn } from "./sign-in.ts";
 
@@ -289,5 +290,5 @@ const J008: Journey = {
 };
 
 export const JOURNEYS: ReadonlyMap<string, Journey> = new Map(
-  [J000, J001, J002, ...DOCUMENT_JOURNEYS, J008, JFAIL].map((j) => [j.id, j]),
+  [J000, J001, J002, ...DOCUMENT_JOURNEYS, ...COMPRESS_JOURNEYS, J008, JFAIL].map((j) => [j.id, j]),
 );

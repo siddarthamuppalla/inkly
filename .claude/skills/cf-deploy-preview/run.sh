@@ -2,11 +2,13 @@
 # cf-deploy-preview: per-PR preview environments on Cloudflare (Q9). See SKILL.md.
 #
 #   run.sh <pr>                 create or reuse inkly-pr-<pr> resources, migrate, deploy, print URL
-#   run.sh --teardown <pr>      delete the Worker, D1, R2 bucket and KV namespace for <pr>
+#   run.sh --teardown <pr>      delete the Worker, D1, R2 bucket, KV namespace, Job queue and
+#                               pdf-engine Container application for <pr>
 #   run.sh --sweep              tear down every inkly-pr-* whose PR is closed (needs gh + GH_TOKEN)
 #   run.sh --list <pr>          print the inkly-pr-<pr> resources that exist, one per line
 #
 # Needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in the environment, plus curl and jq.
+# Deploy also needs a running Docker daemon: wrangler builds the pdf-engine image.
 # Deploy writes the fresh TEST_HOOKS_SECRET to $PREVIEW_SECRET_FILE when set; it never prints it.
 set -euo pipefail
 
@@ -62,6 +64,12 @@ teardown() {
   fi
   id="$(kv_id "$name")"
   if [ -n "$id" ]; then cf DELETE "$acct/storage/kv/namespaces/$id" >/dev/null && echo "kv: deleted $name"; fi
+  id="$(queue_id "$name-jobs")"
+  if [ -n "$id" ]; then cf DELETE "$acct/queues/$id" >/dev/null && echo "queue: deleted $name-jobs"; fi
+  id="$(container_app_id "$name-pdfengine")"
+  if [ -n "$id" ]; then
+    cf DELETE "$acct/containers/applications/$id" >/dev/null && echo "container: deleted $name-pdfengine"
+  fi
   echo "teardown: $name done"
 }
 
@@ -71,6 +79,8 @@ list_one() {
   cf GET "$acct/d1/database?name=$name&per_page=100" | jq -r --arg n "$name" '.result[] | select(.name == $n) | "d1 \(.name) \(.uuid)"'
   if r2_exists "$name"; then echo "r2 $name"; fi
   cf GET "$acct/storage/kv/namespaces?per_page=100" | jq -r --arg n "$name" '.result[] | select(.title == $n) | "kv \(.title) \(.id)"'
+  cf GET "$acct/queues?per_page=100" | jq -r --arg n "$name-jobs" '.result[] | select(.queue_name == $n) | "queue \(.queue_name) \(.queue_id)"'
+  cf GET "$acct/containers/applications" | jq -r --arg n "$name-pdfengine" '.result[]? | select(.name == $n) | "container \(.name) \(.id)"'
 }
 
 sweep() {
@@ -82,6 +92,7 @@ sweep() {
       cf GET "$acct/d1/database?per_page=100" | jq -r '.result[].name'
       cf GET "$acct/r2/buckets?per_page=100" | jq -r '.result.buckets[]?.name'
       cf GET "$acct/storage/kv/namespaces?per_page=100" | jq -r '.result[].title'
+      cf GET "$acct/queues?per_page=100" | jq -r '.result[].queue_name' | sed 's/-jobs$//'
     } | sed -n 's/^inkly-pr-\([0-9][0-9]*\)$/\1/p' | sort -un
   )"
   for pr in $prs; do

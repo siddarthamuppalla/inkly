@@ -1,3 +1,4 @@
+import { consumeJobs, type JobMessage } from "@inkly/jobs";
 import { probeBindings } from "@inkly/storage/health";
 import { Hono } from "hono";
 
@@ -6,10 +7,12 @@ import { documentRoutes } from "./documents.ts";
 import type { Env } from "./env.ts";
 import { onAppError } from "./errors.ts";
 import { folderRoutes } from "./folders.ts";
+import { jobRoutes } from "./jobs.ts";
 import { requireTenant } from "./tenant-context.ts";
 import { testHooks } from "./test-hooks.ts";
 
 export type { Env } from "./env.ts";
+export { PdfEngine } from "@inkly/jobs";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -27,5 +30,12 @@ app.use("/api/documents/*", requireTenant);
 app.route("/api/documents", documentRoutes);
 app.use("/api/folders/*", requireTenant);
 app.route("/api/folders", folderRoutes);
+app.use("/api/jobs/*", requireTenant);
+app.route("/api", jobRoutes);
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // Lets tests drive the app in-process, as Hono's app.request.
+  request: app.request,
+  queue: (batch, env) => consumeJobs(batch, env),
+} satisfies ExportedHandler<Env, JobMessage> & Pick<typeof app, "request">;
