@@ -48,8 +48,13 @@ async function target(c: TenantContext) {
   return { doc, session: docSession(c.env, c.get("tenantId"), doc), aid: aid ?? "" };
 }
 
-async function answer<T>(c: TenantContext, outcome: Outcome<T>, body: (value: T) => unknown) {
-  if (outcome.ok) return c.json(body(outcome.value));
+async function answer<T>(
+  c: TenantContext,
+  outcome: Outcome<T>,
+  body: (value: T) => object,
+  status: 200 | 201 = 200,
+) {
+  if (outcome.ok) return c.json(body(outcome.value), status);
   if (outcome.reason === "invalid_input") {
     throw new AppError("invalid_input", "Only a note's text can be edited");
   }
@@ -108,8 +113,7 @@ annotationRoutes.post("/:id/annotations/:aid/comments", async (c) => {
   const t = await target(c);
   if (!t) return missing(c, "write");
   const outcome = await t.session.addComment(await actorOf(c), t.aid, text);
-  const res = await answer(c, outcome, (annotation) => ({ annotation }));
-  return outcome.ok ? new Response(res.body, { status: 201, headers: res.headers }) : res;
+  return answer(c, outcome, (annotation) => ({ annotation }), 201);
 });
 
 for (const [path, resolved] of [

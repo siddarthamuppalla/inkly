@@ -198,6 +198,11 @@ export class DocSession extends DurableObject<Env> {
     return new Response(null, { status: 101, webSocket: client });
   }
 
+  /** Clients only send "ping", which the auto-response answers; anything else is ignored. */
+  override webSocketMessage(): void {
+    return;
+  }
+
   override webSocketClose(ws: WebSocket, code: number, reason: string): void {
     try {
       ws.close(code, reason);
