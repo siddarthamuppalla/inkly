@@ -30,6 +30,9 @@ export const jobRoutes = new Hono<{ Bindings: Env; Variables: TenantVars }>();
 
 const IDEMPOTENCY_KEY = /^[\x21-\x7e]{1,100}$/;
 
+/** Longer than a Queue consumer may run, so an unfinished Job this old lost its delivery. */
+const STALE_JOB_MS = 15 * 60_000;
+
 export function jobInfo(job: JobRow): JobInfo {
   return {
     id: job.id,
@@ -82,12 +85,15 @@ jobRoutes.post("/documents/:id/compress", viewersReadOnly, async (c) => {
   const { job, created } = await createJob(tenantId, c.env, {
     id: mintJobId(),
     // Without a client key, compressing the same Version at the same level is one Job.
-    idempotencyKey: key ?? `compress:${doc.id}:v${String(doc.currentVersion)}:${level}`,
+    idempotencyKey:
+      key === undefined
+        ? `compress:${doc.id}:v${String(doc.currentVersion)}:${level}`
+        : `client:${doc.id}:${key}`,
     documentId: doc.id,
     input: { level, fromVersion: doc.currentVersion },
     createdBy: c.get("session").userId,
   });
-  if (created || (await requeueJob(tenantId, c.env, job.id))) {
+  if (created || (await requeueJob(tenantId, c.env, job.id, Date.now() - STALE_JOB_MS))) {
     await enqueue(c, job);
     const queued = await getJob(tenantId, c.env, job.id);
     return c.json({ job: jobInfo(queued ?? job) }, 202);

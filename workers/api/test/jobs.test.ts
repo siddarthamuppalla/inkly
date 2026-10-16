@@ -1,8 +1,10 @@
 import type { Role } from "@inkly/auth";
 import type { JobId, JobInfo, TenantId, UserId } from "@inkly/domain";
 import {
+  COMMIT_GRACE_MS,
   consumeJobs,
   EngineRefusal,
+  engineFor,
   runJob,
   type Compressed,
   type Engine,
@@ -10,7 +12,7 @@ import {
 } from "@inkly/jobs";
 import { addVersion, beginJobCommit, getJob, listVersions, startJobAttempt } from "@inkly/storage";
 import { Hono } from "hono";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { onAppError } from "../src/errors.ts";
 import type { Env } from "../src/index.ts";
@@ -57,6 +59,14 @@ function fakeEngine(
 interface Delivery {
   acked: boolean;
   retried: boolean;
+}
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve = () => {};
+  const promise = new Promise<void>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
 }
 
 async function deliver(body: JobMessage, engine: Engine, attempts = 1): Promise<Delivery> {
@@ -152,6 +162,35 @@ describe("POST /api/documents/:id/compress", () => {
     const [ja, jb] = [await a.json<{ job: JobInfo }>(), await b.json<{ job: JobInfo }>()];
     expect(jb.job).toMatchObject({ id: ja.job.id, level: "screen" });
     expect((await compress(owner, doc.id, q, { key: "bad key" })).status).toBe(422);
+  });
+
+  it("starts a new Job when the same Idempotency-Key names another Document", async () => {
+    const owner = await seed();
+    const [first, second] = [await uploaded(owner, "10p.pdf"), await uploaded(owner, "tiny.pdf")];
+    const q = withQueue();
+    expect((await compress(owner, first.id, q, { key: "click-1" })).status).toBe(202);
+    const other = await compress(owner, second.id, q, { key: "click-1" });
+    expect(other.status).toBe(202);
+    expect((await other.json<{ job: JobInfo }>()).job.documentId).toBe(second.id);
+  });
+
+  it("sends a Job again when its delivery died, and not while one may still be running", async () => {
+    const owner = await seed();
+    const { doc, q, job } = await started(owner);
+    const id = job.id as JobId;
+    await startJobAttempt(owner.tenantId, hooks, id);
+    expect((await compress(owner, doc.id, q)).status).toBe(200);
+    expect(q.sent).toHaveLength(1);
+
+    // The runtime killed that delivery 16 minutes ago; nothing will ever finish it.
+    await startJobAttempt(owner.tenantId, hooks, id, Date.now() - 16 * 60_000);
+    const again = await compress(owner, doc.id, q);
+    expect(again.status).toBe(202);
+    expect((await again.json<{ job: JobInfo }>()).job).toMatchObject({
+      id: job.id,
+      status: "queued",
+    });
+    expect(q.sent).toHaveLength(2);
   });
 
   it("refuses an unknown level", async () => {
@@ -273,6 +312,38 @@ describe("the jobs consumer", () => {
     ]);
   });
 
+  it("adds one Version when a second delivery arrives while the first is still committing", async () => {
+    const owner = await seed();
+    const { doc, job, message } = await started(owner);
+    const writing = deferred();
+    const release = deferred();
+    // The first delivery's R2 write stalls: it has claimed the commit but no Version row exists yet.
+    const files = hooks.FILES;
+    const stalled = {
+      get: files.get.bind(files),
+      put: async (key: string, body: Uint8Array, options?: R2PutOptions) => {
+        writing.resolve();
+        await release.promise;
+        return files.put(key, body, options);
+      },
+    } as unknown as typeof files;
+    const first = runJob({ ...hooks, FILES: stalled }, message, fakeEngine(), false);
+    await writing.promise;
+    const second = fakeEngine();
+    await runJob(hooks, message, second, false);
+    release.resolve();
+    await first;
+
+    expect((await listVersions(owner.tenantId, hooks, doc.id as never)).map((v) => v.n)).toEqual([
+      2, 1,
+    ]);
+    expect(second.calls).toBe(0);
+    expect(await jobOf(owner, job.id)).toMatchObject({
+      status: "succeeded",
+      output: { version: 2 },
+    });
+  });
+
   it("finishes a Job whose Version landed before the delivery crashed, without adding another", async () => {
     const owner = await seed();
     const { doc, job, message } = await started(owner);
@@ -307,7 +378,10 @@ describe("the jobs consumer", () => {
     await beginJobCommit(owner.tenantId, hooks, id, attempt ?? 0, "0".repeat(64));
 
     const engine = fakeEngine();
-    await deliver(message, engine);
+    expect(await runJob(hooks, message, engine, false)).toBe("retry");
+    expect(engine.calls).toBe(0);
+    const later = Date.now() + COMMIT_GRACE_MS + 1;
+    expect(await runJob(hooks, message, engine, false, later)).toBe("done");
     expect(engine.calls).toBe(1);
     expect(await jobOf(owner, job.id)).toMatchObject({
       status: "succeeded",
@@ -351,7 +425,7 @@ describe("the jobs consumer", () => {
   it("succeeds without a new Version when the PDF is already as small as it gets", async () => {
     const owner = await seed();
     const { doc, job, message } = await started(owner);
-    const engine = fakeEngine(() => ({ body: fixture("10p.pdf"), compressed: false }));
+    const engine = fakeEngine(() => ({ compressed: false }));
     await deliver(message, engine);
     const bytes = fixture("10p.pdf").byteLength;
     expect(await jobOf(owner, job.id)).toMatchObject({
@@ -372,5 +446,33 @@ describe("the jobs consumer", () => {
     });
     expect(await getJob(owner.tenantId, hooks, "job_missing" as JobId)).toBeNull();
     expect(engine.calls).toBe(0);
+  });
+});
+
+describe("the pdf-engine client", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("does not read the echoed PDF when the engine could not make it smaller", async () => {
+    let cancelled = false;
+    const echoed = new ReadableStream(
+      {
+        pull: () => {
+          throw new Error("the echoed body was read");
+        },
+        cancel: () => {
+          cancelled = true;
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(echoed, { status: 200, headers: { "x-inkly-compressed": "false" } }),
+    );
+    const engine = engineFor({ ...hooks, PDF_ENGINE_URL: "http://engine.test" });
+    const pdf = fixture("10p.pdf");
+    expect(await engine.compress(pdf, pdf.byteLength, "ebook")).toEqual({ compressed: false });
+    expect(cancelled).toBe(true);
   });
 });

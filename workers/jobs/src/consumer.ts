@@ -24,6 +24,12 @@ import type { JobMessage } from "./message.ts";
 /** Deliveries per message: keep equal to `max_retries` + 1 in workers/api/wrangler.jsonc. */
 export const MAX_DELIVERIES = 3;
 
+/**
+ * How long a commit may take before another delivery treats it as crashed. Until then the
+ * delivery that claimed it may still be adding its Version.
+ */
+export const COMMIT_GRACE_MS = 5 * 60_000;
+
 const REFUSALS: Record<string, string> = {
   pdf_encrypted: "This PDF is password-protected, so it can't be compressed.",
   pdf_malformed: "This PDF is damaged, so it can't be compressed.",
@@ -32,6 +38,8 @@ const REFUSALS: Record<string, string> = {
 const UNAVAILABLE = "Compression didn't finish. Try again in a few minutes.";
 
 type Outcome = "done" | "retry";
+
+type CommittingJob = JobRow & { status: "committing"; commitSha256: string };
 
 function logJob(event: string, fields: Record<string, unknown> = {}): void {
   const line = { event, ...fields };
@@ -48,22 +56,41 @@ async function sourceBytes(tenantId: TenantId, env: JobsEnv, job: JobRow): Promi
   return versions.find((v) => v.n === job.input.fromVersion)?.bytes ?? 0;
 }
 
-/**
- * Finishes a Job left `committing` by an earlier delivery: succeeded when its Version
- * landed, otherwise back to `queued` so this delivery runs it again.
- */
-async function reconcileCommit(tenantId: TenantId, env: JobsEnv, job: JobRow): Promise<boolean> {
+function isCommitting(job: JobRow): job is CommittingJob {
+  return job.status === "committing" && job.commitSha256 !== null;
+}
+
+/** Marks a committing Job succeeded when its Version landed. */
+async function finishLandedCommit(
+  tenantId: TenantId,
+  env: JobsEnv,
+  job: CommittingJob,
+): Promise<boolean> {
   const landed = await findCommittedVersion(tenantId, env, job);
-  if (!landed) {
-    await abandonJobCommit(tenantId, env, job.id);
-    return false;
-  }
-  await completeJob(tenantId, env, job.id, {
+  if (!landed) return false;
+  const output: CompressOutput = {
     version: landed.n,
     bytesBefore: await sourceBytes(tenantId, env, job),
     bytesAfter: landed.bytes,
-  });
+  };
+  await completeJob(tenantId, env, job.id, output, { commitSha256: job.commitSha256 });
   return true;
+}
+
+/**
+ * Settles a Job another delivery left `committing`: succeeded when its Version landed, left
+ * alone while that delivery may still be adding it, otherwise queued to run again.
+ */
+async function settleCommit(
+  tenantId: TenantId,
+  env: JobsEnv,
+  job: CommittingJob,
+  now: number,
+): Promise<"landed" | "in_flight" | "abandoned"> {
+  if (await finishLandedCommit(tenantId, env, job)) return "landed";
+  if (now - (job.committingAt ?? 0) < COMMIT_GRACE_MS) return "in_flight";
+  await abandonJobCommit(tenantId, env, job.id, job.commitSha256);
+  return "abandoned";
 }
 
 async function fail(tenantId: TenantId, env: JobsEnv, job: JobRow, error: string, cause: string) {
@@ -80,6 +107,7 @@ export async function runJob(
   message: JobMessage,
   engine: Engine,
   lastDelivery: boolean,
+  now = Date.now(),
 ): Promise<Outcome> {
   const tenantId = tenantOfQueuedJob(message.tenantId);
   if (!tenantId || !isWellFormedId(message.jobId)) {
@@ -88,7 +116,11 @@ export async function runJob(
   }
   const found = await getJob(tenantId, env, message.jobId as JobId);
   if (!found || found.status === "succeeded" || found.status === "failed") return "done";
-  if (found.status === "committing" && (await reconcileCommit(tenantId, env, found))) return "done";
+  if (isCommitting(found)) {
+    const commit = await settleCommit(tenantId, env, found, now);
+    if (commit === "landed") return "done";
+    if (commit === "in_flight") return "retry";
+  }
 
   const attempt = await startJobAttempt(tenantId, env, found.id);
   if (attempt === null) return "done";
@@ -127,7 +159,7 @@ export async function runJob(
   const bytesBefore = source.version.bytes;
   if (!result.compressed) {
     const output: CompressOutput = { version: null, bytesBefore, bytesAfter: bytesBefore };
-    await completeJob(tenantId, env, job.id, output, attempt);
+    await completeJob(tenantId, env, job.id, output, { attempt });
     return "done";
   }
 
@@ -135,7 +167,7 @@ export async function runJob(
   // A newer delivery of this message owns the Job now; it adds the Version.
   if (!(await beginJobCommit(tenantId, env, job.id, attempt, sha256))) return "done";
   const committing = await getJob(tenantId, env, job.id);
-  if (!committing) return "done";
+  if (!committing || !isCommitting(committing)) return "done";
   try {
     await addVersion(tenantId, env, job.documentId, {
       body: result.body,
@@ -144,10 +176,12 @@ export async function runJob(
       createdBy: job.createdBy,
     });
   } catch (err) {
-    if (await reconcileCommit(tenantId, env, committing)) return "done";
+    if (await finishLandedCommit(tenantId, env, committing)) return "done";
+    // This delivery owns the commit and knows it failed, so the next one need not wait.
+    await abandonJobCommit(tenantId, env, job.id, sha256);
     throw err;
   }
-  await reconcileCommit(tenantId, env, committing);
+  await finishLandedCommit(tenantId, env, committing);
   return "done";
 }
 
@@ -178,7 +212,7 @@ async function giveUp(env: JobsEnv, message: JobMessage): Promise<Outcome> {
   const jobId = message.jobId as JobId;
   try {
     const job = await getJob(tenantId, env, jobId);
-    if (job?.status === "committing" && (await reconcileCommit(tenantId, env, job))) return "done";
+    if (job && isCommitting(job) && (await finishLandedCommit(tenantId, env, job))) return "done";
     await failJob(tenantId, env, jobId, UNAVAILABLE);
   } catch (err) {
     logJob("job_error", { message: String(err), giveUp: true });

@@ -6,11 +6,9 @@ import type { JobsEnv } from "./env.ts";
 
 // The consumer's view of pdf-engine (containers/pdf-engine/README.md). Tests pass a fake.
 
-export interface Compressed {
-  readonly body: Uint8Array;
-  /** False when the engine could not make the PDF smaller and returned the input. */
-  readonly compressed: boolean;
-}
+/** The smaller PDF, or `compressed: false` when the engine could not make it smaller. */
+export type Compressed =
+  { readonly compressed: true; readonly body: Uint8Array } | { readonly compressed: false };
 
 export interface Engine {
   compress(
@@ -45,10 +43,12 @@ function httpEngine(fetcher: Fetcher, base: string): Engine {
         body: pdf,
       });
       if (res.status === 200) {
-        return {
-          body: new Uint8Array(await res.arrayBuffer()),
-          compressed: res.headers.get("x-inkly-compressed") === "true",
-        };
+        if (res.headers.get("x-inkly-compressed") === "true") {
+          return { compressed: true, body: new Uint8Array(await res.arrayBuffer()) };
+        }
+        // The engine echoes the input; reading it would only fill the Worker's memory.
+        await res.body?.cancel();
+        return { compressed: false };
       }
       const reply: { error?: string } = await res.json<{ error?: string }>().catch(() => ({}));
       const code = reply.error;

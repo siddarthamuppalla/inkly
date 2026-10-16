@@ -115,13 +115,24 @@ export async function createJob(
   return { job: parse(raw), created: res.meta.changes > 0 };
 }
 
-/** Puts a failed Job back in the queue. False when it is not failed. */
-export async function requeueJob(tenantId: TenantId, env: StorageEnv, id: JobId): Promise<boolean> {
+/**
+ * Makes a Job ready to be sent to the Queue again: a failed one, or one whose delivery
+ * died (unfinished and untouched since `staleBefore`). A committing Job stays committing so
+ * the next delivery can find its Version. False when the Job needs nothing.
+ */
+export async function requeueJob(
+  tenantId: TenantId,
+  env: StorageEnv,
+  id: JobId,
+  staleBefore: number,
+): Promise<boolean> {
   const res = await env.DB.prepare(
-    `UPDATE jobs SET status = 'queued', error = NULL, updated_at = ?3
-     WHERE tenant_id = ?1 AND id = ?2 AND status = 'failed'`,
+    `UPDATE jobs SET status = CASE status WHEN 'committing' THEN 'committing' ELSE 'queued' END,
+       error = NULL, updated_at = ?3
+     WHERE tenant_id = ?1 AND id = ?2
+       AND (status = 'failed' OR (status IN ('queued', 'running', 'committing') AND updated_at < ?4))`,
   )
-    .bind(tenantId, id, Date.now())
+    .bind(tenantId, id, Date.now(), staleBefore)
     .run();
   return res.meta.changes > 0;
 }
@@ -134,13 +145,14 @@ export async function startJobAttempt(
   tenantId: TenantId,
   env: StorageEnv,
   id: JobId,
+  now = Date.now(),
 ): Promise<number | null> {
   const row = await env.DB.prepare(
     `UPDATE jobs SET status = 'running', attempts = attempts + 1, updated_at = ?3
      WHERE tenant_id = ?1 AND id = ?2 AND status IN ('queued', 'running')
      RETURNING attempts`,
   )
-    .bind(tenantId, id, Date.now())
+    .bind(tenantId, id, now)
     .first<{ attempts: number }>();
   return row?.attempts ?? null;
 }
@@ -185,43 +197,49 @@ export async function findCommittedVersion(
     .first<{ n: number; bytes: number }>();
 }
 
-/** Returns a committing Job whose Version never landed to `queued`, so it runs again. */
+/**
+ * Returns a committing Job whose Version never landed to `queued`, so it runs again; only
+ * while the commit is still the one recorded with `sha256`.
+ */
 export async function abandonJobCommit(
   tenantId: TenantId,
   env: StorageEnv,
   id: JobId,
+  sha256: string,
 ): Promise<void> {
   await env.DB.prepare(
     `UPDATE jobs SET status = 'queued', commit_sha256 = NULL, committing_at = NULL, updated_at = ?3
-     WHERE tenant_id = ?1 AND id = ?2 AND status = 'committing'`,
+     WHERE tenant_id = ?1 AND id = ?2 AND status = 'committing' AND commit_sha256 = ?4`,
   )
-    .bind(tenantId, id, Date.now())
+    .bind(tenantId, id, Date.now(), sha256)
     .run();
 }
 
 /**
- * Marks a Job succeeded with its output. With `attempt`, only while that attempt is
- * still the running one (a Job that needed no new Version); without, only while committing.
+ * Which delivery may finish a Job: the running `attempt` that needed no new Version, or the
+ * commit recorded with `commitSha256`.
  */
+type JobOwner = { attempt: number } | { commitSha256: string };
+
+/** Marks a Job succeeded with its output, only while `owner` still owns it. */
 export async function completeJob(
   tenantId: TenantId,
   env: StorageEnv,
   id: JobId,
   output: CompressOutput,
-  attempt?: number,
+  owner: JobOwner,
 ): Promise<boolean> {
-  const owned =
-    attempt === undefined ? "status = 'committing'" : `status = 'running' AND attempts = ?5`;
-  const stmt = env.DB.prepare(
+  const [owned, value] =
+    "attempt" in owner
+      ? ["status = 'running' AND attempts = ?5", owner.attempt]
+      : ["status = 'committing' AND commit_sha256 = ?5", owner.commitSha256];
+  const res = await env.DB.prepare(
     `UPDATE jobs SET status = 'succeeded', output = ?3, error = NULL, updated_at = ?4
      WHERE tenant_id = ?1 AND id = ?2 AND ${owned}`,
-  );
-  const now = Date.now();
-  const bound =
-    attempt === undefined
-      ? stmt.bind(tenantId, id, JSON.stringify(output), now)
-      : stmt.bind(tenantId, id, JSON.stringify(output), now, attempt);
-  return (await bound.run()).meta.changes > 0;
+  )
+    .bind(tenantId, id, JSON.stringify(output), Date.now(), value)
+    .run();
+  return res.meta.changes > 0;
 }
 
 /** Marks a queued or running Job failed with `error`; never touches a committing or finished one. */
