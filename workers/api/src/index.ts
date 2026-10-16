@@ -7,6 +7,7 @@ import type { Env } from "./env.ts";
 import { onAppError } from "./errors.ts";
 import { folderRoutes } from "./folders.ts";
 import { formRoutes } from "./forms.ts";
+import { pageOpRoutes } from "./page-ops.ts";
 import { requireTenant } from "./tenant-context.ts";
 import { testHooks } from "./test-hooks.ts";
 
@@ -25,6 +26,7 @@ app.get("/health", async (c) => {
 app.route("/__test", testHooks);
 app.route("/api", account);
 app.use("/api/documents/*", requireTenant);
+app.route("/api/documents", pageOpRoutes);
 app.route("/api/documents", documentRoutes);
 app.route("/api/documents", formRoutes);
 app.use("/api/folders/*", requireTenant);

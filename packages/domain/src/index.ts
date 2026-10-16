@@ -5,6 +5,7 @@ export {
   assertFileSizeAllowed,
   assertUploadAllowed,
   MiB,
+  pageOpLimitError,
   PLAN_LIMITS,
   type Plan,
   type PlanLimits,
@@ -33,3 +34,12 @@ export {
   type FormFieldType,
   type FormValues,
 } from "./forms.ts";
+export {
+  DeletePagesRequest,
+  MergeRequest,
+  parseRanges,
+  ReorderRequest,
+  RotateRequest,
+  SplitRange,
+  SplitRequest,
+} from "./page-ops.ts";

@@ -9,6 +9,7 @@ const FIXTURES = [
   "tiny.pdf",
   "rotated.pdf",
   "encrypted.pdf",
+  "encrypted-objstm.pdf",
   "malformed.pdf",
   "forms.pdf",
 ];

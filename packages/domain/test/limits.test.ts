@@ -14,8 +14,12 @@ function refusal(fn: () => void): { code: string; status: number } | null {
 
 describe("plan limits (Q8)", () => {
   it("gives Free 25 MiB per file and 500 MiB of storage, Pro 100 MiB and 20 GiB", () => {
-    expect(PLAN_LIMITS.free).toEqual({ fileBytes: 25 * MiB, storageBytes: 500 * MiB });
-    expect(PLAN_LIMITS.pro).toEqual({ fileBytes: 100 * MiB, storageBytes: 20 * 1024 * MiB });
+    expect(PLAN_LIMITS.free).toEqual({ fileBytes: 25 * MiB, storageBytes: 500 * MiB, pageOps: 50 });
+    expect(PLAN_LIMITS.pro).toEqual({
+      fileBytes: 100 * MiB,
+      storageBytes: 20 * 1024 * MiB,
+      pageOps: 2000,
+    });
   });
 
   it("refuses a 26 MiB file on Free with 413 limit_exceeded and allows it on Pro", () => {
