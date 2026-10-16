@@ -24,12 +24,6 @@ import type { JobMessage } from "./message.ts";
 /** Deliveries per message: keep equal to `max_retries` + 1 in workers/api/wrangler.jsonc. */
 export const MAX_DELIVERIES = 3;
 
-/**
- * How long a commit may take before another delivery treats it as crashed. Until then the
- * delivery that claimed it may still be adding its Version.
- */
-export const COMMIT_GRACE_MS = 5 * 60_000;
-
 const REFUSALS: Record<string, string> = {
   pdf_encrypted: "This PDF is password-protected, so it can't be compressed.",
   pdf_malformed: "This PDF is damaged, so it can't be compressed.",
@@ -78,19 +72,18 @@ async function finishLandedCommit(
 }
 
 /**
- * Settles a Job another delivery left `committing`: succeeded when its Version landed, left
- * alone while that delivery may still be adding it, otherwise queued to run again.
+ * Settles a Job another delivery left `committing`: true when its Version landed, otherwise
+ * it goes back to `queued` for this delivery to run. Should that delivery still be alive, it
+ * can no longer add its Version, because the next attempt takes the commit from it.
  */
 async function settleCommit(
   tenantId: TenantId,
   env: JobsEnv,
   job: CommittingJob,
-  now: number,
-): Promise<"landed" | "in_flight" | "abandoned"> {
-  if (await finishLandedCommit(tenantId, env, job)) return "landed";
-  if (now - (job.committingAt ?? 0) < COMMIT_GRACE_MS) return "in_flight";
+): Promise<boolean> {
+  if (await finishLandedCommit(tenantId, env, job)) return true;
   await abandonJobCommit(tenantId, env, job.id, job.commitSha256);
-  return "abandoned";
+  return false;
 }
 
 async function fail(tenantId: TenantId, env: JobsEnv, job: JobRow, error: string, cause: string) {
@@ -107,7 +100,6 @@ export async function runJob(
   message: JobMessage,
   engine: Engine,
   lastDelivery: boolean,
-  now = Date.now(),
 ): Promise<Outcome> {
   const tenantId = tenantOfQueuedJob(message.tenantId);
   if (!tenantId || !isWellFormedId(message.jobId)) {
@@ -116,11 +108,7 @@ export async function runJob(
   }
   const found = await getJob(tenantId, env, message.jobId as JobId);
   if (!found || found.status === "succeeded" || found.status === "failed") return "done";
-  if (isCommitting(found)) {
-    const commit = await settleCommit(tenantId, env, found, now);
-    if (commit === "landed") return "done";
-    if (commit === "in_flight") return "retry";
-  }
+  if (isCommitting(found) && (await settleCommit(tenantId, env, found))) return "done";
 
   const attempt = await startJobAttempt(tenantId, env, found.id);
   if (attempt === null) return "done";
@@ -169,12 +157,15 @@ export async function runJob(
   const committing = await getJob(tenantId, env, job.id);
   if (!committing || !isCommitting(committing)) return "done";
   try {
-    await addVersion(tenantId, env, job.documentId, {
-      body: result.body,
-      sha256,
-      pages: source.version.pages,
-      createdBy: job.createdBy,
-    });
+    const added = await addVersion(
+      tenantId,
+      env,
+      job.documentId,
+      { body: result.body, sha256, pages: source.version.pages, createdBy: job.createdBy },
+      { jobId: job.id, attempt },
+    );
+    // A newer delivery took the commit while this one was writing; it adds the Version.
+    if (!added) return "done";
   } catch (err) {
     if (await finishLandedCommit(tenantId, env, committing)) return "done";
     // This delivery owns the commit and knows it failed, so the next one need not wait.

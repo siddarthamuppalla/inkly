@@ -1,7 +1,6 @@
 import type { Role } from "@inkly/auth";
 import type { JobId, JobInfo, TenantId, UserId } from "@inkly/domain";
 import {
-  COMMIT_GRACE_MS,
   consumeJobs,
   EngineRefusal,
   engineFor,
@@ -10,7 +9,14 @@ import {
   type Engine,
   type JobMessage,
 } from "@inkly/jobs";
-import { addVersion, beginJobCommit, getJob, listVersions, startJobAttempt } from "@inkly/storage";
+import {
+  addVersion,
+  beginJobCommit,
+  getJob,
+  listTenantObjectKeys,
+  listVersions,
+  startJobAttempt,
+} from "@inkly/storage";
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -312,15 +318,16 @@ describe("the jobs consumer", () => {
     ]);
   });
 
-  it("adds one Version when a second delivery arrives while the first is still committing", async () => {
+  it("adds one Version when a second delivery takes over while the first is still writing", async () => {
     const owner = await seed();
     const { doc, job, message } = await started(owner);
     const writing = deferred();
     const release = deferred();
-    // The first delivery's R2 write stalls: it has claimed the commit but no Version row exists yet.
+    // The first delivery's R2 write stalls: it holds the commit but no Version row exists yet.
     const files = hooks.FILES;
     const stalled = {
       get: files.get.bind(files),
+      delete: files.delete.bind(files),
       put: async (key: string, body: Uint8Array, options?: R2PutOptions) => {
         writing.resolve();
         await release.promise;
@@ -330,18 +337,22 @@ describe("the jobs consumer", () => {
     const first = runJob({ ...hooks, FILES: stalled }, message, fakeEngine(), false);
     await writing.promise;
     const second = fakeEngine();
-    await runJob(hooks, message, second, false);
+    expect(await runJob(hooks, message, second, false)).toBe("done");
     release.resolve();
-    await first;
+    expect(await first).toBe("done");
 
-    expect((await listVersions(owner.tenantId, hooks, doc.id as never)).map((v) => v.n)).toEqual([
-      2, 1,
-    ]);
-    expect(second.calls).toBe(0);
+    expect(second.calls).toBe(1);
+    const versions = await listVersions(owner.tenantId, hooks, doc.id as never);
+    expect(versions.map((v) => v.n)).toEqual([3, 1]);
     expect(await jobOf(owner, job.id)).toMatchObject({
       status: "succeeded",
-      output: { version: 2 },
+      output: { version: 3 },
     });
+    const objects = await listTenantObjectKeys(owner.tenantId, hooks);
+    expect(objects.filter((key) => key.includes(doc.id)).map((key) => key.slice(-3))).toEqual([
+      "/v1",
+      "/v3",
+    ]);
   });
 
   it("finishes a Job whose Version landed before the delivery crashed, without adding another", async () => {
@@ -378,10 +389,7 @@ describe("the jobs consumer", () => {
     await beginJobCommit(owner.tenantId, hooks, id, attempt ?? 0, "0".repeat(64));
 
     const engine = fakeEngine();
-    expect(await runJob(hooks, message, engine, false)).toBe("retry");
-    expect(engine.calls).toBe(0);
-    const later = Date.now() + COMMIT_GRACE_MS + 1;
-    expect(await runJob(hooks, message, engine, false, later)).toBe("done");
+    await deliver(message, engine);
     expect(engine.calls).toBe(1);
     expect(await jobOf(owner, job.id)).toMatchObject({
       status: "succeeded",

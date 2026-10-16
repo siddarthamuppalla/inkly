@@ -118,7 +118,8 @@ export async function createJob(
 /**
  * Makes a Job ready to be sent to the Queue again: a failed one, or one whose delivery
  * died (unfinished and untouched since `staleBefore`). A committing Job stays committing so
- * the next delivery can find its Version. False when the Job needs nothing.
+ * the next delivery can find its Version, and stays stale so a failed send can be retried.
+ * False when the Job needs nothing.
  */
 export async function requeueJob(
   tenantId: TenantId,
@@ -128,7 +129,7 @@ export async function requeueJob(
 ): Promise<boolean> {
   const res = await env.DB.prepare(
     `UPDATE jobs SET status = CASE status WHEN 'committing' THEN 'committing' ELSE 'queued' END,
-       error = NULL, updated_at = ?3
+       error = NULL, updated_at = CASE status WHEN 'committing' THEN updated_at ELSE ?3 END
      WHERE tenant_id = ?1 AND id = ?2
        AND (status = 'failed' OR (status IN ('queued', 'running', 'committing') AND updated_at < ?4))`,
   )
