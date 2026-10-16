@@ -58,7 +58,11 @@ const J007: Journey = {
 
     const versions = page.getByTestId("version");
     await reach(ctx, versions.nth(1).waitFor(WAIT), "version history does not list v2");
-    const top = (await versions.first().textContent().catch(() => "")) ?? "";
+    const top =
+      (await versions
+        .first()
+        .textContent()
+        .catch(() => "")) ?? "";
     expect(
       top.includes("Version 2") && top.includes("Current") && top.includes("1 page"),
       `the newest version reads "${top}", expected Version 2, Current, 1 page`,

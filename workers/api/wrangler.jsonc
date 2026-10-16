@@ -45,6 +45,6 @@
   ],
   "durable_objects": { "bindings": [{ "name": "PDF_ENGINE", "class_name": "PdfEngine" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PdfEngine"] }],
-  // Local dev and verify-app call a pdf-engine process through PDF_ENGINE_URL instead.
+  // Local dev and verify-app call a local pdf-engine process instead (workers/jobs/src/env.ts).
   "dev": { "enable_containers": false },
 }

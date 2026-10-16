@@ -35,7 +35,8 @@ function run(cmd: string, args: readonly string[], cwd: string, env: NodeJS.Proc
 async function waitForHealth(url: string, child: ChildProcess, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error(`${url} process exited (${String(child.exitCode)})`);
+    if (child.exitCode !== null)
+      throw new Error(`${url} process exited (${String(child.exitCode)})`);
     try {
       const res = await fetch(url);
       if (res.status < 500) return;
@@ -55,7 +56,10 @@ async function startPdfEngine(
   const port = await freePort();
   const child = spawn(
     process.execPath,
-    ["--disable-warning=ExperimentalWarning", join(repoRoot, "containers/pdf-engine/src/server.ts")],
+    [
+      "--disable-warning=ExperimentalWarning",
+      join(repoRoot, "containers/pdf-engine/src/server.ts"),
+    ],
     { env: { ...process.env, PORT: String(port) }, stdio: ["ignore", "pipe", "pipe"] },
   );
   child.stdout.on("data", (d: Buffer) => log.push(`[pdf-engine] ${d.toString()}`));

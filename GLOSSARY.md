@@ -76,6 +76,12 @@ _Avoid_: recycle bin, archive
 
 **Job**: Async unit of work on a Queue, possibly executed in the pdf-engine Container.
 
+**Job status**: Where a Job is: `queued`, `running`, `succeeded` or `failed` (with an error). A failed Job never changed its Document.
+
+**Idempotency key**: The per-Tenant key a Job is enqueued under; enqueueing the same key again returns the existing Job. Compress defaults it to the Document, Version and level, or takes the client's `Idempotency-Key` header.
+
+**Compress level**: pdf-engine's quality preset: `screen` (Smallest file), `ebook` (Balanced, the default) or `printer` (Best quality).
+
 **pdf-engine**: Container service for heavy PDF ops.
 
 **Worker ceiling**: The largest input a Page op runs on inside a Worker (25 MB or 200 pages, `MAX_WORKER_BYTES`/`MAX_WORKER_PAGES` in `packages/pdf`); larger inputs go to pdf-engine.
