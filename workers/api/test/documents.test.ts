@@ -163,6 +163,7 @@ describe("list, get and download", () => {
         shareLinkId: null,
         ip: null,
         userAgent: null,
+        documentId: doc.id,
       },
       {
         action: "read-content",
@@ -173,6 +174,7 @@ describe("list, get and download", () => {
         shareLinkId: null,
         ip: null,
         userAgent: null,
+        documentId: doc.id,
       },
     ]);
   });
