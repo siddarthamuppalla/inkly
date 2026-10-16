@@ -1,5 +1,5 @@
 import type { TenantId } from "@inkly/domain";
-import type { AccessDenied } from "@inkly/domain/log";
+import type { AccessDenied, AccessGranted } from "@inkly/domain/log";
 import type { StorageEnv } from "./env.ts";
 
 export interface AccessLogRow {
@@ -10,11 +10,11 @@ export interface AccessLogRow {
   at: number;
 }
 
-/** Appends a denied-access entry to the actor tenant's access log (append-only). */
+/** Appends a denied or granted access entry to the actor tenant's access log (append-only). */
 export async function appendAccessLog(
   tenantId: TenantId,
   env: StorageEnv,
-  entry: AccessDenied,
+  entry: AccessDenied | AccessGranted,
 ): Promise<void> {
   await env.DB.prepare(
     "INSERT INTO access_log (tenant_id, actor_user_id, action, resource, status, at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",

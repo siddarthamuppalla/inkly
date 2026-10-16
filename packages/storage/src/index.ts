@@ -9,11 +9,26 @@ export {
   type MemberRow,
 } from "./members.ts";
 export {
-  createStubDoc,
-  getStubDoc,
-  getStubDocContent,
-  listStubDocs,
-  updateStubDoc,
-  type StubDocRow,
-} from "./stub-docs.ts";
-export { getVersionBytes, putVersionBytes } from "./versions.ts";
+  addVersion,
+  createDocument,
+  getDocument,
+  listDocuments,
+  listVersions,
+  openVersion,
+  restoreVersion,
+  setTrashed,
+  updateDocument,
+  type DocumentRow,
+  type NewVersion,
+  type VersionRow,
+} from "./documents.ts";
+export {
+  createFolder,
+  deleteFolder,
+  getFolder,
+  listFolders,
+  updateFolder,
+  type FolderRow,
+} from "./folders.ts";
+export { getUsage, type UsageRow } from "./usage.ts";
+export { listTenantObjectKeys, MULTIPART_PART_BYTES } from "./versions.ts";

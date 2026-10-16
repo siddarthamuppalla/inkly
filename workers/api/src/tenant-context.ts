@@ -1,6 +1,6 @@
 import { authenticate, resolveTenant, type Session } from "@inkly/auth";
 import type { TenantId } from "@inkly/domain";
-import { accessDenied, logEvent, type AccessAction } from "@inkly/domain/log";
+import { accessDenied, accessGranted, logEvent, type AccessAction } from "@inkly/domain/log";
 import { appendAccessLog } from "@inkly/storage";
 import type { Context, MiddlewareHandler } from "hono";
 
@@ -53,3 +53,20 @@ export const requireTenant: MiddlewareHandler<{ Bindings: Env; Variables: Tenant
   c.set("tenantId", resolved.tenantId);
   await next();
 };
+
+/** Records an allowed access (e.g. every content read) in the caller's access log. */
+export async function grantAccess(
+  c: TenantContext,
+  action: AccessAction,
+  resource: string,
+): Promise<void> {
+  const session = c.get("session");
+  const entry = accessGranted({
+    actorTenantId: session.tenantId,
+    actorUserId: session.userId,
+    action,
+    resource,
+  });
+  logEvent(entry);
+  await appendAccessLog(session.tenantId, c.env, entry);
+}

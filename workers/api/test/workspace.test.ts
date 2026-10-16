@@ -1,4 +1,3 @@
-import type { TenantId } from "@inkly/domain";
 import { setTenantPlan } from "@inkly/storage";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
@@ -94,7 +93,7 @@ describe("invitations", () => {
     const owner = await seed({ plan: "pro" });
     const email = uniqueEmail("late");
     await invite(owner, email);
-    await setTenantPlan(owner.tenantId as TenantId, env, "free");
+    await setTenantPlan(owner.tenantId, env, "free");
     const invitee = await seed({ email });
     const id = await invitationIdIn(email);
     const res = await as(invitee, `/api/invitations/${id}/accept`, { method: "POST" });
@@ -135,9 +134,13 @@ describe("switching the Active tenant", () => {
   it("acts on the new tenant only after a switch", async () => {
     const { owner, joiner } = await twoMemberTenant();
     // Accepting switched the joiner into the owner's tenant; switch back to their own.
-    const create = (who: Seeded, title: string) =>
-      as(who, "/v0/stub-docs", { method: "POST", body: JSON.stringify({ title }) });
-    await create(owner, "shared doc");
+    const create = (who: Seeded, name: string) =>
+      as(who, "/api/folders", { method: "POST", body: JSON.stringify({ name, parentId: null }) });
+    const names = async (who: Seeded) =>
+      (await (await as(who, "/api/folders")).json<{ folders: { name: string }[] }>()).folders.map(
+        (f) => f.name,
+      );
+    await create(owner, "shared folder");
 
     const back = await as(joiner, "/api/me/active-tenant", {
       method: "POST",
@@ -145,12 +148,11 @@ describe("switching the Active tenant", () => {
     });
     expect(back.status).toBe(200);
     expect((await me(joiner)).activeTenant?.id).toBe(joiner.tenantId);
-    await create(joiner, "personal doc");
-    const ownList = await (await as(joiner, "/v0/stub-docs")).json<{ docs: { title: string }[] }>();
-    expect(ownList.docs.map((d) => d.title)).toEqual(["personal doc"]);
+    await create(joiner, "personal folder");
+    expect(await names(joiner)).toEqual(["personal folder"]);
 
     // Naming the other tenant without switching is refused.
-    const named = await as(joiner, "/v0/stub-docs", {
+    const named = await as(joiner, "/api/folders", {
       headers: { "x-inkly-tenant": owner.tenantId },
     });
     expect(named.status).toBe(403);
@@ -159,8 +161,7 @@ describe("switching the Active tenant", () => {
       method: "POST",
       body: JSON.stringify({ tenantId: owner.tenantId }),
     });
-    const shared = await (await as(joiner, "/v0/stub-docs")).json<{ docs: { title: string }[] }>();
-    expect(shared.docs.map((d) => d.title)).toEqual(["shared doc"]);
+    expect(await names(joiner)).toEqual(["shared folder"]);
   });
 
   it("refuses switching to a tenant the User is not a Member of, and logs it", async () => {

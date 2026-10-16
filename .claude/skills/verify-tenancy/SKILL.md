@@ -6,16 +6,21 @@ description: Attack tenant isolation end to end. As tenant A, try to read, write
 # verify-tenancy
 
 Gate for ADR-0004 (tenant isolation). It seeds two fresh tenants, A and B, through
-the test hooks. B creates a stub doc, then A tries to reach it every known way:
-- by id;
-- by claiming B's tenant in the `x-inkly-tenant` header or the `?tenant=` query;
-- by writing to it;
-- by listing B's docs;
-- by fetching its R2 object.
+the test hooks. B creates a folder, a Document in it and a Document in Trash; A creates
+its own folder and Document. Then A tries to reach B's data every known way:
+- by id, and by claiming B's tenant in the `x-inkly-tenant` header or the `?tenant=` query;
+- by renaming, moving, trashing and restoring B's Documents, and moving its own
+  Document into B's folder;
+- by listing B's Documents, folder contents and folders;
+- by fetching B's content and Version content (the R2 objects);
+- by listing, adding and restoring B's Versions;
+- by uploading into, nesting under, renaming, moving into and deleting B's folder.
 
 Pass means every attempt returned 403 or 404. A's access log must hold exactly one
-entry per denied attempt, and B's doc must be unchanged. Control requests also
-confirm that A can reach its own doc, so a broken route can't pass as a denial.
+denial entry per denied attempt, and B's Documents and folders must be unchanged.
+Control requests also confirm that A can reach its own Document, content, Versions and
+folder (and that its two content reads were logged), so a broken route can't pass as a
+denial.
 
 ## When to run it
 - Any change to `packages/storage`, `packages/auth`, or a tenant-scoped route.
@@ -41,6 +46,6 @@ It prints a table of attempts with their statuses. Exit codes: `0` pass, `1` a l
 or check failure. For `--self-test`, `0` means the leak was caught.
 
 ## What it attacks today
-The stub endpoints `GET/POST /v0/stub-docs`, `GET/PUT /v0/stub-docs/:id` and
-`GET /v0/stub-docs/:id/content` (`workers/api/src/stub-docs.ts`). They exist only for
-this skill and are replaced by real documents later.
+`/api/documents` (`workers/api/src/documents.ts`) and `/api/folders`
+(`workers/api/src/folders.ts`). Add cases to `attack.ts` when a new tenant-scoped
+route ships.

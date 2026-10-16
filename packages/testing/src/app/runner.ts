@@ -98,6 +98,7 @@ export async function runJourneys(
           page,
           baseUrl,
           secret,
+          outDir,
           expect: (cond, msg) => {
             if (!cond) failures.push(msg);
           },

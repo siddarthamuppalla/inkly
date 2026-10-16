@@ -14,8 +14,8 @@ journey, and `summary.md`. Paste the summary path into the PR's Verification Evi
 - When adding a feature: add its row to `feature-map.md` and its automation to
   `packages/testing/src/app/journeys.ts` under the same ID, then run it.
 - After changing this skill: run `--self-test`.
-- CI runs `--self-test`, `J-000`, `J-001`, `J-002` and `J-008` on every PR.
-- Journeys that need a signed-in user call `signedIn(ctx)` from `journeys.ts`: it seeds a
+- CI runs `--self-test`, `J-000`, `J-001`, `J-002`, `J-003`, `J-004`, `J-005` and `J-008` on every PR.
+- Journeys that need a signed-in user call `signedIn(ctx)` from `src/app/sign-in.ts`: it seeds a
   Tenant and owner through `/__test/seed` and sends `Authorization: Bearer <token>` on
   every later request from the page. It needs the test-hooks secret.
 

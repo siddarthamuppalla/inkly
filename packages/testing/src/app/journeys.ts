@@ -1,10 +1,15 @@
 import type { Locator, Page } from "playwright";
 
+import { DOCUMENT_JOURNEYS } from "./documents.ts";
+import { signedIn } from "./sign-in.ts";
+
 export interface JourneyContext {
   readonly page: Page;
   readonly baseUrl: string;
-  /** Test-hooks secret for the target, when known (local wrangler dev or --secret). */
+  /** The target's test-hooks secret, when the run has one (needed to seed and sign in). */
   readonly secret: string | undefined;
+  /** This run's artifact directory, for files a journey keeps (e.g. a download). */
+  readonly outDir: string;
   /** Records a failed expectation; the journey keeps going so the report is complete. */
   readonly expect: (condition: boolean, message: string) => void;
   /** Screenshots the page in light and dark schemes and runs an axe WCAG 2.1 A/AA scan of each. */
@@ -132,41 +137,6 @@ const J001: Journey = {
     await checkpoint("design-320");
   },
 };
-
-export interface SeededUser {
-  readonly tenantId: string;
-  readonly userId: string;
-  readonly email: string;
-  readonly token: string;
-}
-
-async function seedUser(
-  ctx: JourneyContext,
-  input: { email?: string; plan?: "free" | "pro" } = {},
-): Promise<SeededUser> {
-  if (ctx.secret === undefined) {
-    throw new Error("this journey needs the test-hooks secret (--secret or local wrangler dev)");
-  }
-  const res = await ctx.page.request.post(new URL("/__test/seed", ctx.baseUrl).toString(), {
-    headers: { "x-test-hooks-secret": ctx.secret },
-    data: input,
-  });
-  if (res.status() !== 201) throw new Error(`POST /__test/seed returned ${String(res.status())}`);
-  return (await res.json()) as SeededUser;
-}
-
-/**
- * Seeds a fresh Tenant and owner through `/__test/seed` and signs the page in as them:
- * every later request from the page carries `Authorization: Bearer <token>`.
- */
-export async function signedIn(
-  ctx: JourneyContext,
-  input: { email?: string; plan?: "free" | "pro" } = {},
-): Promise<SeededUser> {
-  const user = await seedUser(ctx, input);
-  await ctx.page.setExtraHTTPHeaders({ authorization: `Bearer ${user.token}` });
-  return user;
-}
 
 /** The newest Outbox email for `to`, read through `/__test/outbox`. */
 async function latestMail(ctx: JourneyContext, to: string): Promise<string> {
@@ -319,5 +289,5 @@ const J008: Journey = {
 };
 
 export const JOURNEYS: ReadonlyMap<string, Journey> = new Map(
-  [J000, J001, J002, J008, JFAIL].map((j) => [j.id, j]),
+  [J000, J001, J002, ...DOCUMENT_JOURNEYS, J008, JFAIL].map((j) => [j.id, j]),
 );

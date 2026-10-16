@@ -10,6 +10,7 @@ import { LinksRoute } from "./routes/links.tsx";
 import { MembersRoute } from "./routes/members.tsx";
 import { NotFoundRoute } from "./routes/not-found.tsx";
 import { SignInRoute } from "./routes/sign-in.tsx";
+import { TrashRoute } from "./routes/trash.tsx";
 
 export const router = createBrowserRouter([
   { path: "sign-in", Component: SignInRoute },
@@ -22,6 +23,14 @@ export const router = createBrowserRouter([
         loader: requireMe,
         children: [
           { index: true, Component: DocumentsRoute },
+          {
+            path: "documents/:id",
+            HydrateFallback: () => null,
+            lazy: async () => ({
+              Component: (await import("./routes/document.tsx")).DocumentRoute,
+            }),
+          },
+          { path: "trash", Component: TrashRoute },
           { path: "envelopes", Component: EnvelopesRoute },
           { path: "links", Component: LinksRoute },
           { path: "members", Component: MembersRoute },

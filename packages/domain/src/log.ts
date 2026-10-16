@@ -20,6 +20,23 @@ export function accessDenied(fields: Omit<AccessDenied, "event" | "at">): Access
   return { event: "access_denied", at: Date.now(), ...fields };
 }
 
+/** A successful read of tenant data that must leave a trace, e.g. every content read. */
+export interface AccessGranted {
+  readonly event: "access_granted";
+  readonly actorTenantId: string;
+  readonly actorUserId: string;
+  readonly action: AccessAction;
+  readonly resource: string;
+  readonly status: 200;
+  readonly at: number;
+}
+
+export function accessGranted(
+  fields: Omit<AccessGranted, "event" | "at" | "status">,
+): AccessGranted {
+  return { event: "access_granted", status: 200, at: Date.now(), ...fields };
+}
+
 export function logEvent(event: { readonly event: string }): void {
   console.log(JSON.stringify(event));
 }

@@ -39,6 +39,19 @@ _Avoid_: quota, credits
 
 **Version**: An immutable PDF byte stream in R2 with sha256; edits create new versions.
 
+**Current version**: The Version a Document shows and downloads; the newest one, since restoring an old Version copies it into a new one.
+
+**Restore (version)**: Copying an earlier Version's bytes into a new current Version; nothing is overwritten.
+_Avoid_: revert, rollback
+
+**Folder**: A named, nestable container for Documents within one Tenant; a Document is in at most one folder, or at the top level.
+_Avoid_: directory
+
+**Trash**: Where a deleted Document waits (`deleted_at` set); hidden from lists and restorable. Its bytes stay stored and count toward storage Usage.
+_Avoid_: recycle bin, archive
+
+**Access log**: Append-only record, per Tenant, of denied requests and of every read of Document content.
+
 **Page op**: A structural change: merge, split, rotate, reorder, delete, insert.
 
 **Annotation**: Non-destructive overlay (highlight, comment, drawing) until flattened.
