@@ -1,5 +1,5 @@
 // verify-tenancy: as tenant A, try to reach tenant B's Documents, Versions, folders,
-// content, Share links and workspace every way we know. Every attempt must be refused (403/404) and leave an
+// content, Share links, activity and workspace every way we know. Every attempt must be refused (403/404) and leave an
 // access-log entry.
 
 import { readFileSync } from "node:fs";
@@ -330,6 +330,18 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
       name: "revoke B's share link",
       method: "POST",
       path: `/api/share-links/${linkB.link.id}/revoke`,
+    },
+    { name: "read B's Document activity", method: "GET", path: `${d}/activity` },
+    {
+      name: "read B's Document activity claiming B's tenant",
+      method: "GET",
+      path: `${d}/activity`,
+      init: { headers: asB },
+    },
+    {
+      name: "read B's share link activity",
+      method: "GET",
+      path: `/api/share-links/${linkB.link.id}/activity`,
     },
     {
       name: "switch Active tenant to B",

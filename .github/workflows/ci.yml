@@ -45,7 +45,7 @@ jobs:
       - uses: ./.github/actions/setup
         with: { chromium: "true" }
       - run: .claude/skills/verify-app/run.sh --self-test
-      - run: .claude/skills/verify-app/run.sh J-000 J-001 J-002 J-003 J-004 J-005 J-006 J-008 J-011
+      - run: .claude/skills/verify-app/run.sh J-000 J-001 J-002 J-003 J-004 J-005 J-006 J-008 J-011 J-012
       - if: always()
         uses: actions/upload-artifact@v4
         with:

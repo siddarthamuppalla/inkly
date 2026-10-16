@@ -2,6 +2,7 @@ import { shareLinkStatus, type ShareLinkInfo } from "@inkly/domain";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 
+import { ActivityList } from "../components/activity-list.tsx";
 import { Page } from "../components/page.tsx";
 import { shareLinkKeys } from "../components/share-dialog.tsx";
 import { ShareLinkStatusBadge } from "../components/share-link-status.tsx";
@@ -116,8 +117,20 @@ function LinkRow({
       <td className="tabular py-3 pr-4">
         {link.expiresAt === null ? "Never" : formatDateTime(link.expiresAt)}
       </td>
-      <td className="tabular py-3 pr-4" data-testid="share-link-opens">
-        {link.opens}
+      <td className="tabular py-3 pr-4">
+        {canRevoke && link.opens > 0 ? (
+          <details>
+            <summary className="cursor-pointer">
+              <span data-testid="share-link-opens">{link.opens}</span>
+              <span className="sr-only"> opens, show each one</span>
+            </summary>
+            <div className="mt-2 w-64">
+              <ActivityList of="shareLink" id={link.id} label="Activity on this link" />
+            </div>
+          </details>
+        ) : (
+          <span data-testid="share-link-opens">{link.opens}</span>
+        )}
       </td>
       <td className="tabular py-3 pr-4">
         {link.lastOpenedAt === null ? "Not yet" : formatDateTime(link.lastOpenedAt)}
