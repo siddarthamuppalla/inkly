@@ -108,6 +108,10 @@ describe("inspect", () => {
     expect(info).toMatchObject({ pages: 2, encrypted: true });
   });
 
+  it("refuses an encrypted PDF whose page tree is in encrypted object streams", async () => {
+    expect(await rejection(inspect(fixture("encrypted-objstm.pdf")))).toBe("pdf_encrypted");
+  });
+
   it("refuses malformed input and non-PDF bytes", async () => {
     expect(await rejection(inspect(fixture("malformed.pdf")))).toBe("pdf_malformed");
     expect(await rejection(inspect(new TextEncoder().encode("hello")))).toBe("pdf_malformed");

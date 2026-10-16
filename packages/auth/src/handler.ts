@@ -2,6 +2,7 @@ import { AppError } from "@inkly/domain";
 import { countWindowHit } from "@inkly/storage/auth";
 
 import { getAuth } from "./better-auth.ts";
+import { withEmailFailures } from "./email-failures.ts";
 import type { AuthEnv } from "./env.ts";
 
 // `/api/auth/*`: only the Better-Auth endpoints the sign-in page needs are reachable.
@@ -59,9 +60,18 @@ export async function handleAuthRequest(request: Request, env: AuthEnv): Promise
   if (!ROUTES.has(`${request.method} ${path}`)) {
     return Response.json({ error: "not_found", message: "Not found" }, { status: 404 });
   }
-  if (CODE_REQUESTS.has(path)) {
-    const email = await emailOf(request);
-    if (email) await limitCodeRequests(env, email);
+  const auth = getAuth(env, request.url);
+  if (!CODE_REQUESTS.has(path)) return auth.handler(request);
+  const email = await emailOf(request);
+  if (email) await limitCodeRequests(env, email);
+  // Better-Auth swallows a failed send and answers success; surface it instead, so
+  // the sign-in page never says "Check your email" for mail that was not sent.
+  const { result, failed } = await withEmailFailures(() => auth.handler(request));
+  if (failed) {
+    throw new AppError(
+      "email_failed",
+      "We couldn't send the email. Try again later, or continue with Google.",
+    );
   }
-  return getAuth(env, request.url).handler(request);
+  return result;
 }

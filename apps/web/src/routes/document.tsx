@@ -4,6 +4,7 @@ import { useState, type SyntheticEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { Page } from "../components/page.tsx";
+import { PageEdits } from "../components/page-edits.tsx";
 import { PageCanvas, usePdf } from "../components/pdf-pages.tsx";
 import { SharePanel } from "../components/share-dialog.tsx";
 import { Badge } from "../components/ui/badge.tsx";
@@ -72,6 +73,7 @@ function Viewer({ doc }: { readonly doc: DocumentInfo }) {
           className="flex flex-col gap-6 md:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1"
         >
           <Actions doc={doc} />
+          <PageEdits key={doc.currentVersion} doc={doc} pdf={pdf} />
           <SharePanel doc={doc} />
           <Versions doc={doc} />
         </aside>

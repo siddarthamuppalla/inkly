@@ -96,6 +96,7 @@ describe("upload", () => {
     ["a text file", new TextEncoder().encode("hello, not a pdf"), "invalid_input"],
     ["malformed.pdf", fixture("malformed.pdf"), "pdf_malformed"],
     ["encrypted.pdf", fixture("encrypted.pdf"), "pdf_encrypted"],
+    ["encrypted-objstm.pdf", fixture("encrypted-objstm.pdf"), "pdf_encrypted"],
   ])("refuses %s with 422 and writes nothing", async (_, bytes, code) => {
     const a = await seed();
     const res = await upload(a, bytes);

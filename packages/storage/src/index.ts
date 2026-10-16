@@ -30,7 +30,7 @@ export {
   updateFolder,
   type FolderRow,
 } from "./folders.ts";
-export { getUsage, type UsageRow } from "./usage.ts";
+export { claimPageOp, getUsage, releasePageOp, type UsageRow } from "./usage.ts";
 export { listTenantObjectKeys, MULTIPART_PART_BYTES } from "./versions.ts";
 export {
   createShareLink,

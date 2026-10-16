@@ -1,6 +1,7 @@
 import type { Locator, Page } from "playwright";
 
-import { DOCUMENT_JOURNEYS } from "./documents.ts";
+import { DOCUMENT_JOURNEYS, openDocuments, uploadFromList } from "./documents.ts";
+import { PAGE_OP_JOURNEYS } from "./page-ops.ts";
 import { SHARE_JOURNEYS } from "./share-links.ts";
 import { signedIn } from "./sign-in.ts";
 
@@ -227,6 +228,16 @@ const J002: Journey = {
     );
     await checkpoint("signed-in");
 
+    // The document journeys sign in with a seeded bearer token; this one proves the
+    // real cookie session from the email code can upload too.
+    await openDocuments(ctx);
+    await uploadFromList(ctx, "tiny.pdf");
+    expect(
+      await visible(page.getByTestId("document-row").filter({ hasText: "tiny" })),
+      "a PDF uploaded with the cookie session is not listed",
+    );
+    await checkpoint("uploaded");
+
     await page.getByRole("button", { name: "Sign out" }).click();
     await page.waitForURL("**/sign-in", { timeout: 10_000 }).catch(() => undefined);
     expect(new URL(page.url()).pathname === "/sign-in", `after sign-out at ${page.url()}`);
@@ -294,5 +305,7 @@ const J008: Journey = {
 };
 
 export const JOURNEYS: ReadonlyMap<string, Journey> = new Map(
-  [J000, J001, J002, ...DOCUMENT_JOURNEYS, J008, ...SHARE_JOURNEYS, JFAIL].map((j) => [j.id, j]),
+  [J000, J001, J002, ...DOCUMENT_JOURNEYS, ...PAGE_OP_JOURNEYS, J008, ...SHARE_JOURNEYS, JFAIL].map(
+    (j) => [j.id, j],
+  ),
 );

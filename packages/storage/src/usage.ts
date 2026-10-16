@@ -37,3 +37,31 @@ export async function getUsage(tenantId: TenantId, env: StorageEnv): Promise<Usa
     .first<{ storageBytes: number; ops: number }>();
   return { period, ops: row?.ops ?? 0, storageBytes: row?.storageBytes ?? 0 };
 }
+
+/**
+ * Counts one page op against this period's Usage if fewer than `max` are used; atomic, so
+ * concurrent ops cannot overshoot. False means the Limit is reached and nothing was counted.
+ */
+export async function claimPageOp(
+  tenantId: TenantId,
+  env: StorageEnv,
+  max: number,
+): Promise<boolean> {
+  const row = await env.DB.prepare(
+    `INSERT INTO usage (tenant_id, period, ops) VALUES (?1, ?2, 1)
+     ON CONFLICT (tenant_id, period) DO UPDATE SET ops = ops + 1 WHERE usage.ops < ?3
+     RETURNING ops`,
+  )
+    .bind(tenantId, usagePeriod(Date.now()), max)
+    .first<{ ops: number }>();
+  return row !== null;
+}
+
+/** Gives back a page op claimed this period whose result was not stored. */
+export async function releasePageOp(tenantId: TenantId, env: StorageEnv): Promise<void> {
+  await env.DB.prepare(
+    "UPDATE usage SET ops = MAX(ops - 1, 0) WHERE tenant_id = ?1 AND period = ?2",
+  )
+    .bind(tenantId, usagePeriod(Date.now()))
+    .run();
+}

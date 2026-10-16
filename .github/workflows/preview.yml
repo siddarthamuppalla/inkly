@@ -63,8 +63,9 @@ jobs:
           TEST_HOOKS_SECRET="$(cat "$RUNNER_TEMP/preview-secret")"
           export TEST_HOOKS_SECRET
           pnpm --filter @inkly/testing exec playwright install --with-deps chromium
-          .claude/skills/verify-app/run.sh --url "$URL" J-000
+          .claude/skills/verify-app/run.sh --url "$URL" J-000 J-006
           .claude/skills/verify-tenancy/run.sh --url "$URL"
+          .claude/skills/verify-perf/run.sh --url "$URL"
       - name: upload verify-app artifacts
         if: always() && steps.secrets.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
