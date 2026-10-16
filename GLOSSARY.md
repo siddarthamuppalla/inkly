@@ -54,11 +54,25 @@ _Avoid_: recycle bin, archive
 
 **Page op**: A structural change: merge, split, rotate, reorder, delete, insert.
 
-**Annotation**: Non-destructive overlay (highlight, comment, drawing) until flattened.
+**Annotation**: A non-destructive overlay on a Document page (highlight, note or ink), stored by its DocSession; it never changes a Version. "Download with annotations" renders them into the bytes without storing a Version.
+
+**Comment**: A Member's message in the thread attached to one Annotation; a thread can be resolved and reopened.
+_Avoid_: reply, remark
+
+**DocSession**: The per-Document Durable Object (`{tenantId}/{documentId}`) that is the single writer of its Annotations and Comments and broadcasts changes and presence to open viewers.
+
+**Presence**: Which Members have a Document open right now, shown in the viewer via the DocSession.
+
+**Form field**: A fillable AcroForm field in a Version (text, checkbox, radio, dropdown, option list). Filling and saving creates a new Version.
 
 **Flatten**: Burn annotations/form values into page content, producing a new version.
 
-**Share link**: Tokenized, optionally expiring/password-protected access to a document.
+**Share link**: A tokenized URL (`/s/{token}`) that lets anyone holding it open a Document's current Version without signing in, until it expires or is revoked. Only the token's sha256 is stored. Free links expire within 7 days and have no password; Pro links can set any expiry, a password and "No download".
+_Avoid_: public link
+
+**Revoke (share link)**: Ending a Share link immediately; the row stays for the Access log.
+
+**Activity**: A Document's view of its Access log entries: who viewed, downloaded, unlocked or was denied, including opens through Share links.
 
 ## Signing
 
