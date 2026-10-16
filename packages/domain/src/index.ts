@@ -5,6 +5,7 @@ export {
   assertFileSizeAllowed,
   assertUploadAllowed,
   MiB,
+  pageOpLimitError,
   PLAN_LIMITS,
   type Plan,
   type PlanLimits,
@@ -35,3 +36,12 @@ export {
   JobResponse,
   type JobStatus,
 } from "./jobs.ts";
+export {
+  DeletePagesRequest,
+  MergeRequest,
+  parseRanges,
+  ReorderRequest,
+  RotateRequest,
+  SplitRange,
+  SplitRequest,
+} from "./page-ops.ts";

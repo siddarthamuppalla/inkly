@@ -52,7 +52,7 @@ _Avoid_: recycle bin, archive
 
 **Access log**: Append-only record, per Tenant, of denied requests and of every read of Document content.
 
-**Page op**: A structural change: merge, split, rotate, reorder, delete, insert.
+**Page op**: A structural change: merge, split, rotate, reorder, delete, insert. Each one counts once against the Plan's monthly page-op Limit (`usage.ops`; Free 50, Pro 2,000 fair use); an edit of one Document adds a Version, while merge and split add new Documents.
 
 **Annotation**: Non-destructive overlay (highlight, comment, drawing) until flattened.
 

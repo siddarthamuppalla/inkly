@@ -63,8 +63,9 @@ jobs:
           TEST_HOOKS_SECRET="$(cat "$RUNNER_TEMP/preview-secret")"
           export TEST_HOOKS_SECRET
           pnpm --filter @inkly/testing exec playwright install --with-deps chromium
-          .claude/skills/verify-app/run.sh --url "$URL" J-000 J-007
+          .claude/skills/verify-app/run.sh --url "$URL" J-000 J-006 J-007
           .claude/skills/verify-tenancy/run.sh --url "$URL"
+          .claude/skills/verify-perf/run.sh --url "$URL"
       - name: upload verify-app artifacts
         if: always() && steps.secrets.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
@@ -80,7 +81,7 @@ jobs:
         with:
           script: |
             const marker = "<!-- inkly-preview -->";
-            const body = `${marker}\nPreview: ${process.env.URL}\n\nCommit ${context.payload.pull_request.head.sha.slice(0, 7)}: \`/health\` 200, verify-app J-000 J-007 and verify-tenancy passed against it.`;
+            const body = `${marker}\nPreview: ${process.env.URL}\n\nCommit ${context.payload.pull_request.head.sha.slice(0, 7)}: \`/health\` 200, verify-app J-000 J-006 J-007 and verify-tenancy passed against it.`;
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
             const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
