@@ -24,3 +24,19 @@ export {
   VersionInfo,
   VersionListResponse,
 } from "./documents.ts";
+export {
+  ANNOTATION_COLORS,
+  Annotation,
+  AnnotationColor,
+  AnnotationListResponse,
+  AnnotationPatch,
+  AnnotationResponse,
+  AnnotationShape,
+  Author,
+  Comment,
+  CommentCreate,
+  LiveMessage,
+  Point,
+  Rect,
+  type AnnotationKind,
+} from "./annotations.ts";
