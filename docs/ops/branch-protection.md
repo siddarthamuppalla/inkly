@@ -21,11 +21,15 @@ All are jobs in `.github/workflows/ci.yml`:
 | `audit` | `pnpm audit --audit-level high` |
 | `prod-config` | production `wrangler.jsonc` has no `TEST_HOOKS` (Q11) |
 | `secrets` | gitleaks |
+| `workflows` | `scripts/bot-guard.test.sh` (bot kill switch, token and branch-filter guards) and `actionlint` on `.github/workflows/` |
 
 `preview` is deliberately not required: it skips when the Cloudflare secrets are
 absent, and fork PRs never get it. `verifier` (T1.7) is not required either: it
 skips on drafts and until `CLAUDE_CODE_OAUTH_TOKEN` is set, and it stops while any
 open issue carries `factory-pause` or the repo variable `FACTORY_PAUSED` is `true`.
+`triage` and `pr-watcher` (T2.5) are not required for the same reasons; they are
+not status checks on a PR's own commits at all (they run on `issues` and on CI or
+review events). All three gate through `scripts/bot-guard.sh`.
 
 ## Apply it
 With the GitHub CLI signed in as a repo admin:
@@ -37,7 +41,7 @@ gh api -X PUT repos/siddarthamuppalla/inkly/branches/main/protection \
 {
   "required_status_checks": {
     "strict": true,
-    "contexts": ["check", "test", "verify-pdf", "verify-app", "verify-tenancy", "audit", "prod-config", "secrets"]
+    "contexts": ["check", "test", "verify-pdf", "verify-app", "verify-tenancy", "audit", "prod-config", "secrets", "workflows"]
   },
   "enforce_admins": true,
   "required_pull_request_reviews": { "required_approving_review_count": 0 },
@@ -50,7 +54,7 @@ JSON
 ```
 
 Or use the web UI: Settings, Branches, then add a rule for `main`. Turn on "Require
-status checks to pass" and add the eight checks above. Turn on "Require a pull
+status checks to pass" and add the nine required checks above. Turn on "Require a pull
 request before merging" and leave "Allow force pushes" off.
 
 ## Check it
