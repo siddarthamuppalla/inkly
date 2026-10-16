@@ -5,6 +5,7 @@ export {
   assertFileSizeAllowed,
   assertUploadAllowed,
   MiB,
+  pageOpLimitError,
   PLAN_LIMITS,
   type Plan,
   type PlanLimits,
@@ -40,3 +41,12 @@ export {
   Rect,
   type AnnotationKind,
 } from "./annotations.ts";
+export {
+  DeletePagesRequest,
+  MergeRequest,
+  parseRanges,
+  ReorderRequest,
+  RotateRequest,
+  SplitRange,
+  SplitRequest,
+} from "./page-ops.ts";

@@ -21,17 +21,18 @@ them). On Ubuntu: `sudo apt-get install -y qpdf ghostscript`.
 .claude/skills/verify-perf/run.sh                    # measure and gate
 .claude/skills/verify-perf/run.sh --update-baseline  # rewrite perf-baseline.json
 .claude/skills/verify-perf/run.sh --self-test        # prove the gate fires
-.claude/skills/verify-perf/run.sh --url URL          # not yet: exits 2
+.claude/skills/verify-perf/run.sh --url URL [--secret S]  # time the page-op API there
 ```
 
 | Flag | Meaning |
 |------|---------|
 | `--update-baseline` | Measure twice, keep each op's higher p95, and write `perf-baseline.json`. Commit it only with a reason in the PR. |
 | `--self-test` | Measure, then check the gate against fabricated inputs: the results must pass against themselves, a baseline 10x faster must trip the regression rule, and a fabricated 3001 ms p95 must trip the bound. Exits 0 only if all three hold. |
-| `--url URL` | Reserved for timing a deployed environment. It exits 2 with "not yet: needs page-op API (T1.3b)" until that API exists. |
+| `--url URL` | Time the page-op API of a running environment (wrangler dev or a preview) instead of the in-process ops. Seeds a Pro owner through `/__test/seed`, uploads `50p.pdf` and `10p.pdf`, then times `POST /api/documents/merge`, `/:id/split`, `/:id/rotate` and `/:id/reorder` request to response. Only the 3 s bound applies: there is no baseline for a deployed target. |
+| `--secret S` | With `--url`: the target's test-hooks secret. Defaults to `$TEST_HOOKS_SECRET`; without one it fails. |
 | `-h`, `--help` | Print usage. |
 
-Exit codes: `0` pass, `1` gate failed or error, `2` not available (`--url`).
+Exit codes: `0` pass, `1` gate failed or error.
 
 ## What it measures
 Each op runs once to warm up, then 10 timed runs, one after another (wall clock).

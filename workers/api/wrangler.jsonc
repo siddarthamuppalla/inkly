@@ -5,6 +5,17 @@
   "compatibility_date": "2026-10-01",
   // Better-Auth needs AsyncLocalStorage (node:async_hooks).
   "compatibility_flags": ["nodejs_compat"],
+  // Workers Logs: every deploy applies this, so dashboard-only settings would be reset.
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true,
+    },
+    "traces": { "enabled": false, "head_sampling_rate": 1, "persist": true },
+    "issue_detection": { "enabled": false },
+  },
   // ADR-0002: the SPA in apps/web is served as static assets by this Worker.
   "assets": {
     "directory": "../../apps/web/dist",
