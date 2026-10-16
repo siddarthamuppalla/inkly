@@ -4,7 +4,14 @@ import { readFileSync } from "node:fs";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
 import { defineConfig } from "vitest/config";
 
-const FIXTURES = ["10p.pdf", "tiny.pdf", "rotated.pdf", "encrypted.pdf", "malformed.pdf"];
+const FIXTURES = [
+  "10p.pdf",
+  "tiny.pdf",
+  "rotated.pdf",
+  "encrypted.pdf",
+  "malformed.pdf",
+  "forms.pdf",
+];
 
 export default defineConfig(async () => {
   const migrations = await readD1Migrations("./migrations");

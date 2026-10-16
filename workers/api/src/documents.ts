@@ -33,11 +33,11 @@ export const documentRoutes = new Hono<{ Bindings: Env; Variables: TenantVars }>
 
 documentRoutes.use("*", viewersReadOnly);
 
-function missing(c: TenantContext, action: AccessAction): Promise<Response> {
+export function missing(c: TenantContext, action: AccessAction): Promise<Response> {
   return denyAccess(c, action, `${c.req.method} ${c.req.path}`, 404);
 }
 
-async function findDocument(c: TenantContext): Promise<DocumentRow | null> {
+export async function findDocument(c: TenantContext): Promise<DocumentRow | null> {
   const id = c.req.param("id") ?? "";
   return isWellFormedId(id) ? getDocument(c.get("tenantId"), c.env, id as DocumentId) : null;
 }
