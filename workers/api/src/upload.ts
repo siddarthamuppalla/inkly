@@ -2,6 +2,7 @@ import {
   AppError,
   assertFileSizeAllowed,
   assertUploadAllowed,
+  isAppError,
   type Plan,
   type TenantId,
 } from "@inkly/domain";
@@ -34,6 +35,13 @@ async function readBody(req: Request, plan: Plan): Promise<Uint8Array> {
   return bytes;
 }
 
+function encryptedRefusal(): AppError {
+  return new AppError(
+    "pdf_encrypted",
+    "This PDF is encrypted, and Inkly can't open encrypted PDFs yet. Remove the protection (for example, print it to a new PDF) and upload that.",
+  );
+}
+
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -63,7 +71,9 @@ export async function receivePdf(
   if (!String.fromCharCode(...body.subarray(0, 1024)).includes("%PDF-")) {
     throw new AppError("invalid_input", "The file is not a PDF");
   }
-  const { pages, encrypted } = await inspect(body);
-  if (encrypted) throw new AppError("pdf_encrypted", "The PDF is password-protected or encrypted");
+  const { pages, encrypted } = await inspect(body).catch((e: unknown) => {
+    throw isAppError(e) && e.code === "pdf_encrypted" ? encryptedRefusal() : e;
+  });
+  if (encrypted) throw encryptedRefusal();
   return { body, sha256: await sha256Hex(body), pages };
 }

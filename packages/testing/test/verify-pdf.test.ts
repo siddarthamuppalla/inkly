@@ -74,6 +74,7 @@ describe("verifyCorpus", () => {
     expect(rows.map((r) => [r.file, r.pass])).toEqual([
       ["10p.pdf", true],
       ["50p.pdf", true],
+      ["encrypted-objstm.pdf", true],
       ["encrypted.pdf", true],
       ["forms.pdf", true],
       ["huge-image.pdf", true],
