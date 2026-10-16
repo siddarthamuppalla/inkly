@@ -69,6 +69,16 @@ jobs:
           pnpm --filter @inkly/testing exec playwright install --with-deps chromium
           .claude/skills/verify-app/run.sh --url "$URL" --all
           .claude/skills/verify-tenancy/run.sh --url "$URL"
+      # TEMPORARY (#53): repeat J-006 to catch the stale-Version flake with diagnostics.
+      - name: J-006 x5 (#53, temporary)
+        if: always() && steps.secrets.outputs.ready == 'true'
+        continue-on-error: true
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          TEST_HOOKS_SECRET="$(cat "$RUNNER_TEMP/preview-secret")"
+          export TEST_HOOKS_SECRET
+          .claude/skills/verify-app/run.sh --url "$URL" J-006 J-006 J-006 J-006 J-006
       # Reported, not gating: on real Cloudflare, split is over the 3 s bound on main today (#54).
       # The ci.yml verify-perf job still gates the in-Worker ops.
       - name: verify-perf on the preview (report only, #54)
