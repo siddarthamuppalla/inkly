@@ -51,7 +51,7 @@ jobs:
         if: steps.secrets.outputs.ready == 'true'
         run: |
           .claude/skills/cf-deploy-preview/run.sh --list "$PR" | tee "$RUNNER_TEMP/resources"
-          for kind in worker d1 r2 kv queue; do
+          for kind in worker d1 r2 kv queue container; do
             n="$(grep -c "^$kind " "$RUNNER_TEMP/resources" || true)"
             [ "$n" = "1" ] || { echo "expected one $kind, found $n"; exit 1; }
           done

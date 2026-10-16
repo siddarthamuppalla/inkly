@@ -9,3 +9,6 @@ EMAIL_PROVIDER=outbox
 # Optional: set both to offer "Continue with Google" on /sign-in.
 # GOOGLE_CLIENT_ID=
 # GOOGLE_CLIENT_SECRET=
+# Optional: Compress under `pnpm dev` needs a local pdf-engine (qpdf + Ghostscript installed):
+#   pnpm --filter @inkly/pdf-engine start    # listens on :8080
+# PDF_ENGINE_URL=http://127.0.0.1:8080
