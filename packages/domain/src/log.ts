@@ -3,16 +3,24 @@
 
 declare const console: { log(line: string): void };
 
-export type AccessAction = "read" | "write" | "list" | "read-content";
+export type AccessAction = "read" | "write" | "list" | "read-content" | "unlock" | "download";
 
-export interface AccessDenied {
+/** Set on entries written for a Share-link visitor rather than a signed-in Member. */
+export interface LinkVisit {
+  readonly shareLinkId?: string;
+  readonly ip?: string | null;
+  readonly userAgent?: string | null;
+}
+
+export interface AccessDenied extends LinkVisit {
   readonly event: "access_denied";
   /** The caller's own tenant. */
   readonly actorTenantId: string;
   readonly actorUserId: string;
   readonly action: AccessAction;
   readonly resource: string;
-  readonly status: 403 | 404;
+  /** 401 and 429 only for Share-link visitors (wrong password, too many attempts). */
+  readonly status: 401 | 403 | 404 | 429;
   readonly at: number;
 }
 
@@ -21,7 +29,7 @@ export function accessDenied(fields: Omit<AccessDenied, "event" | "at">): Access
 }
 
 /** A successful read of tenant data that must leave a trace, e.g. every content read. */
-export interface AccessGranted {
+export interface AccessGranted extends LinkVisit {
   readonly event: "access_granted";
   readonly actorTenantId: string;
   readonly actorUserId: string;

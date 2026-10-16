@@ -32,3 +32,11 @@ export {
 } from "./folders.ts";
 export { getUsage, type UsageRow } from "./usage.ts";
 export { listTenantObjectKeys, MULTIPART_PART_BYTES } from "./versions.ts";
+export {
+  createShareLink,
+  getShareLink,
+  listShareLinks,
+  revokeShareLink,
+  type NewShareLink,
+  type ShareLinkRow,
+} from "./share-links.ts";

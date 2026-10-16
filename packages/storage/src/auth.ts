@@ -115,3 +115,30 @@ export async function countWindowHit(
   await env.KV.put(kvKey, JSON.stringify(next), { expirationTtl: ttlSeconds });
   return next.count;
 }
+
+/** A Share link found by its token's sha256, before anything is known about its Tenant. */
+export interface ShareLinkTarget {
+  tenantId: string;
+  linkId: string;
+  documentId: string;
+  expiresAt: number | null;
+  revokedAt: number | null;
+  passwordHash: string | null;
+  allowDownload: number;
+  documentDeletedAt: number | null;
+}
+
+export async function findShareLinkByTokenHash(
+  env: StorageEnv,
+  tokenHash: string,
+): Promise<ShareLinkTarget | null> {
+  return env.DB.prepare(
+    `SELECT s.tenant_id AS tenantId, s.id AS linkId, s.document_id AS documentId,
+       s.expires_at AS expiresAt, s.revoked_at AS revokedAt, s.password_hash AS passwordHash,
+       s.allow_download AS allowDownload, d.deleted_at AS documentDeletedAt
+     FROM share_links s JOIN documents d ON d.tenant_id = s.tenant_id AND d.id = s.document_id
+     WHERE s.token_hash = ?1`,
+  )
+    .bind(tokenHash)
+    .first<ShareLinkTarget>();
+}
