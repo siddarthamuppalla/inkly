@@ -20,21 +20,13 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       HAS_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+      FACTORY_PAUSED: ${{ vars.FACTORY_PAUSED }}
     steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - name: kill switch and token
         id: gate
-        shell: bash
-        run: |
-          if [ "${{ vars.FACTORY_PAUSED }}" = "true" ] || [ -n "$(gh issue list --label factory-pause --state open --json number -q '.[].number')" ]; then
-            echo "⏸️ verifier paused (factory-pause)" | tee -a "$GITHUB_STEP_SUMMARY"
-          elif [ "$HAS_TOKEN" != "true" ]; then
-            echo "⏭️ verifier skipped: CLAUDE_CODE_OAUTH_TOKEN is not set" | tee -a "$GITHUB_STEP_SUMMARY"
-          else
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          fi
-      - if: steps.gate.outputs.run == 'true'
-        uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+        run: scripts/bot-guard.sh verifier
       - if: steps.gate.outputs.run == 'true'
         uses: ./.github/actions/setup
         with: { pdf-tools: "true", chromium: "true" }
