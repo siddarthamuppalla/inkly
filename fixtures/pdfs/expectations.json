@@ -1,6 +1,7 @@
 {
   "10p.pdf": { "valid": true, "pages": 10 },
   "50p.pdf": { "valid": true, "pages": 50 },
+  "encrypted-objstm.pdf": { "valid": true, "pages": 1, "encrypted": true },
   "encrypted.pdf": { "valid": true, "pages": 2, "encrypted": true },
   "forms.pdf": { "valid": true, "pages": 1, "form": true },
   "huge-image.pdf": { "valid": true, "pages": 1 },

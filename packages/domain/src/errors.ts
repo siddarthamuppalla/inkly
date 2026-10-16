@@ -13,6 +13,7 @@ export type AppErrorCode =
   | "pdf_malformed"
   | "too_large_for_worker"
   | "conflict"
+  | "email_failed"
   | "internal";
 
 const STATUS: Record<AppErrorCode, number> = {
@@ -26,6 +27,7 @@ const STATUS: Record<AppErrorCode, number> = {
   pdf_malformed: 422,
   too_large_for_worker: 413,
   conflict: 409,
+  email_failed: 502,
   internal: 500,
 };
 

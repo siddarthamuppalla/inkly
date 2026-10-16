@@ -1,6 +1,6 @@
 import type { Locator, Page } from "playwright";
 
-import { DOCUMENT_JOURNEYS } from "./documents.ts";
+import { DOCUMENT_JOURNEYS, openDocuments, uploadFromList } from "./documents.ts";
 import { PAGE_OP_JOURNEYS } from "./page-ops.ts";
 import { signedIn } from "./sign-in.ts";
 
@@ -222,6 +222,16 @@ const J002: Journey = {
       "workspace menu does not show the new workspace",
     );
     await checkpoint("signed-in");
+
+    // The document journeys sign in with a seeded bearer token; this one proves the
+    // real cookie session from the email code can upload too.
+    await openDocuments(ctx);
+    await uploadFromList(ctx, "tiny.pdf");
+    expect(
+      await visible(page.getByTestId("document-row").filter({ hasText: "tiny" })),
+      "a PDF uploaded with the cookie session is not listed",
+    );
+    await checkpoint("uploaded");
 
     await page.getByRole("button", { name: "Sign out" }).click();
     await page.waitForURL("**/sign-in", { timeout: 10_000 }).catch(() => undefined);

@@ -2,7 +2,8 @@ import { cloudflareSender, emailSender, readOutbox, resendSender } from "@inkly/
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-import type { Env } from "../src/index.ts";
+import app, { type Env } from "../src/index.ts";
+import { ORIGIN } from "./helpers.ts";
 
 const mail = { to: "Reader@Example.test", subject: "Hello", text: "Body" };
 
@@ -81,5 +82,27 @@ describe("EmailSender", () => {
     expect(sent).toEqual([
       { from: "Inkly <mail@example.test>", to: mail.to, subject: "Hello", text: "Body" },
     ]);
+  });
+});
+
+describe("requesting a sign-in code", () => {
+  it("tells the user when the email could not be sent instead of claiming it was", async () => {
+    // Resend configured but unusable, as when it refuses a recipient: the send throws.
+    const broken: Env = { ...env, EMAIL_PROVIDER: "resend", EMAIL_FROM: "Inkly <a@example.test>" };
+    delete broken.RESEND_API_KEY;
+    const res = await app.request(
+      `${ORIGIN}/api/auth/email-otp/send-verification-otp`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: ORIGIN },
+        body: JSON.stringify({
+          email: `nomail-${crypto.randomUUID().slice(0, 8)}@example.test`,
+          type: "sign-in",
+        }),
+      },
+      broken,
+    );
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({ error: "email_failed" });
   });
 });
