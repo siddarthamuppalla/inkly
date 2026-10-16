@@ -241,6 +241,9 @@ describe("the jobs consumer", () => {
     ).toBe(2);
     const content = await as(owner, `/api/documents/${doc.id}/content`);
     expect(await sha256(await content.arrayBuffer())).toBe(await sha256(fixture("tiny.pdf")));
+    expect(
+      (await accessLog(owner.tenantId)).filter((e) => e.resource.includes(`(job ${job.id})`)),
+    ).toMatchObject([{ action: "read-content", status: 200 }]);
     const listed = await as(owner, `/api/documents/${doc.id}/jobs`);
     expect((await listed.json<{ jobs: JobInfo[] }>()).jobs.map((j) => j.id)).toEqual([job.id]);
   });

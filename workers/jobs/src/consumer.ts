@@ -1,9 +1,10 @@
 import { tenantOfQueuedJob } from "@inkly/auth";
 import { isWellFormedId, type CompressOutput, type JobId, type TenantId } from "@inkly/domain";
-import { logEvent } from "@inkly/domain/log";
+import { accessGranted, logEvent } from "@inkly/domain/log";
 import {
   abandonJobCommit,
   addVersion,
+  appendAccessLog,
   beginJobCommit,
   completeJob,
   failJob,
@@ -99,6 +100,15 @@ export async function runJob(
     await fail(tenantId, env, job, "This version of the document no longer exists.", "missing");
     return "done";
   }
+  // Every content read leaves a trace; the Job reads on behalf of the User who asked for it.
+  const read = accessGranted({
+    actorTenantId: tenantId,
+    actorUserId: job.createdBy,
+    action: "read-content",
+    resource: `document ${doc.id} v${String(job.input.fromVersion)} (job ${job.id})`,
+  });
+  logEvent(read);
+  await appendAccessLog(tenantId, env, read);
 
   let result;
   try {
