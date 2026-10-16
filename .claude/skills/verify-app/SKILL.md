@@ -32,7 +32,6 @@ journey, and `summary.md`. Paste the summary path into the PR's Verification Evi
 | `--url URL` | Target this URL instead of starting `wrangler dev`. |
 | `--secret S` | Test-hooks secret for the target, used to seed. Defaults to `$TEST_HOOKS_SECRET`. Without it, seeding is skipped and noted in the summary. |
 | `--out DIR` | Artifact root. Default `artifacts/verify-app/`. |
-| `--feature-map FILE` | Read journey IDs from FILE instead of `feature-map.md` here. The verifier uses it with `.claude-pr/`, because claude-code-action restores `.claude/` from the base branch on PRs. |
 | `--self-test` | Runs the fixture journey `J-FAIL` against a built-in page four times: clean (must pass), console error, 5xx and an accessibility violation (each must fail for that reason). Exits 0 only if all four behave. |
 | `-h`, `--help` | Print usage. |
 

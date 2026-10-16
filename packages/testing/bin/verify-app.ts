@@ -10,11 +10,11 @@ import { runJourneys, writeSummary, type JourneyResult } from "../src/app/runner
 import { startFixtureServer, type FixtureMode } from "../src/app/self-test-server.ts";
 
 const USAGE = `usage:
-  verify-app <J-ID>... [--url URL] [--secret SECRET] [--out DIR] [--feature-map FILE]
+  verify-app <J-ID>... [--url URL] [--secret SECRET] [--out DIR]
   verify-app --self-test [--out DIR]`;
 
 const repoRoot = resolve(import.meta.dirname, "../../..");
-const defaultFeatureMap = join(repoRoot, ".claude/skills/verify-app/feature-map.md");
+const featureMap = join(repoRoot, ".claude/skills/verify-app/feature-map.md");
 
 function newRunId(): string {
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
@@ -158,7 +158,6 @@ async function main(): Promise<number> {
       url: { type: "string" },
       secret: { type: "string" },
       out: { type: "string" },
-      "feature-map": { type: "string" },
       "self-test": { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
@@ -174,7 +173,6 @@ async function main(): Promise<number> {
     return 2;
   }
   const secret = values.secret ?? process.env["TEST_HOOKS_SECRET"];
-  const featureMap = resolve(values["feature-map"] ?? defaultFeatureMap);
   return verify(positionals, values.url, secret, out, featureMap);
 }
 
