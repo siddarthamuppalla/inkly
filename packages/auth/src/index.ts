@@ -1,3 +1,4 @@
+export { mayChangeAnnotation, type AnnotationChange } from "./annotations.ts";
 export { googleConfigured } from "./better-auth.ts";
 export {
   cloudflareSender,

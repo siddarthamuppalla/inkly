@@ -21,4 +21,9 @@
   ],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "inkly-files" }],
   "kv_namespaces": [{ "binding": "KV", "id": "00000000000000000000000000000000" }],
+  // T2.2: one DocSession per Document, SQLite-backed. Only this Worker binds it.
+  "durable_objects": {
+    "bindings": [{ "name": "DOC_SESSIONS", "class_name": "DocSession" }],
+  },
+  "migrations": [{ "tag": "v1-doc-session", "new_sqlite_classes": ["DocSession"] }],
 }
