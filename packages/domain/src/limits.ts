@@ -41,6 +41,37 @@ export function assertUploadAllowed(
   }
 }
 
+/** Q8: the longest a Free share link may stay open. */
+export const FREE_SHARE_LINK_MAX_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Q8 share-link rules. Free links expire within 7 days, have no password and always allow
+ * download; Pro links may have any expiry or none, a password and download off (402).
+ */
+export function assertShareLinkAllowed(
+  plan: Plan,
+  link: {
+    readonly expiresAt: number | null;
+    readonly password: string | null;
+    readonly allowDownload: boolean;
+  },
+  now: number,
+): void {
+  if (link.expiresAt !== null && link.expiresAt <= now) {
+    throw new AppError("invalid_input", "The expiry date must be in the future");
+  }
+  if (plan === "pro") return;
+  if (link.expiresAt === null || link.expiresAt - now > FREE_SHARE_LINK_MAX_MS) {
+    throw new AppError("limit_exceeded", "Share links on the free plan expire within 7 days");
+  }
+  if (link.password !== null) {
+    throw new AppError("limit_exceeded", "Password-protected links need the Pro plan");
+  }
+  if (!link.allowDownload) {
+    throw new AppError("limit_exceeded", "Turning off download needs the Pro plan");
+  }
+}
+
 /** The `limit_exceeded` (402) a page op gets once the period's page ops are used up. */
 export function pageOpLimitError(plan: Plan): AppError {
   const max = PLAN_LIMITS[plan].pageOps;

@@ -132,8 +132,8 @@ export default tseslint.config(
     rules: { "inkly/no-direct-bindings": "off" },
   },
   {
-    // Test-runtime bootstrap: applies D1 migrations before any test, outside any tenant.
-    files: ["workers/*/test/apply-migrations.ts"],
+    // Test-runtime bootstrap (applies D1 migrations) and raw-row assertions on the schema.
+    files: ["workers/*/test/apply-migrations.ts", "workers/*/test/d1.ts"],
     rules: { "inkly/no-direct-bindings": "off" },
   },
 );

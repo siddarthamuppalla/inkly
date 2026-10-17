@@ -1,5 +1,5 @@
 // verify-tenancy: as tenant A, try to reach tenant B's Documents, Versions, folders,
-// content and workspace every way we know. Every attempt must be refused (403/404) and leave an
+// content, Share links and workspace every way we know. Every attempt must be refused (403/404) and leave an
 // access-log entry.
 
 import { readFileSync } from "node:fs";
@@ -35,7 +35,9 @@ interface Doc {
   deletedAt: number | null;
 }
 
-const PDF = readFileSync(join(import.meta.dirname, "../../../../fixtures/pdfs/tiny.pdf"));
+const FIXTURES = join(import.meta.dirname, "../../../../fixtures/pdfs");
+const PDF = readFileSync(join(FIXTURES, "tiny.pdf"));
+const PDF_10P = readFileSync(join(FIXTURES, "10p.pdf"));
 
 /** Body and content type of an unexpected response, so a failure says who answered. */
 async function describe(res: Response): Promise<string> {
@@ -72,6 +74,17 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 const pdf: RequestInit = { headers: { "content-type": "application/pdf" }, body: PDF };
+const DAY = 24 * 60 * 60 * 1000;
+
+interface Link {
+  link: { id: string };
+  url: string;
+}
+
+const sha256Hex = async (bytes: ArrayBuffer) =>
+  [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 
 export async function attackTenancy(baseUrl: string, secret: string): Promise<TenancyReport> {
   const problems: string[] = [];
@@ -99,6 +112,26 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
   await call(baseUrl, b, "DELETE", `/api/documents/${trashedB.id}`);
   const folderA = await folderOf(a, "A folder");
   const docA = await upload(a, folderA);
+  const sharedB = await created<{ document: Doc }>(
+    await call(baseUrl, b, "POST", "/api/documents?filename=b-shared.pdf", {
+      headers: { "content-type": "application/pdf" },
+      body: PDF_10P,
+    }),
+    "upload B's shared Document",
+  );
+  const shareOf = async (who: Seeded, documentId: string) =>
+    created<Link>(
+      await call(
+        baseUrl,
+        who,
+        "POST",
+        "/api/share-links",
+        json({ documentId, expiresAt: Date.now() + DAY }),
+      ),
+      "create share link",
+    );
+  const linkB = await shareOf(b, sharedB.document.id);
+  const linkA = await shareOf(a, docA.id);
 
   // Control: A can reach its own data, so a denial below is a real denial, not a broken route.
   for (const path of [
@@ -284,6 +317,37 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     },
     { name: "delete B's folder", method: "DELETE", path: `/api/folders/${folderB}` },
     {
+      name: "share B's Document",
+      method: "POST",
+      path: "/api/share-links",
+      init: json({ documentId: sharedB.document.id, expiresAt: Date.now() + DAY }),
+    },
+    {
+      name: "share B's Document claiming B's tenant",
+      method: "POST",
+      path: "/api/share-links",
+      init: {
+        ...json({ documentId: sharedB.document.id, expiresAt: Date.now() + DAY }),
+        headers: { "content-type": "application/json", ...asB },
+      },
+    },
+    {
+      name: "list B's Document's share links",
+      method: "GET",
+      path: `/api/share-links?documentId=${sharedB.document.id}`,
+    },
+    {
+      name: "list share links claiming B's tenant",
+      method: "GET",
+      path: "/api/share-links",
+      init: { headers: asB },
+    },
+    {
+      name: "revoke B's share link",
+      method: "POST",
+      path: `/api/share-links/${linkB.link.id}/revoke`,
+    },
+    {
       name: "switch Active tenant to B",
       method: "POST",
       path: "/api/me/active-tenant",
@@ -354,6 +418,38 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     problems.push("A's list includes B's Document after the switch attempt");
   }
 
+  const ownLinks = (await (await call(baseUrl, a, "GET", "/api/share-links")).json()) as {
+    links?: { id: string }[];
+  };
+  const ownLinkIds = (ownLinks.links ?? []).map((l) => l.id);
+  if (ownLinkIds.includes(linkB.link.id)) problems.push("A's share links include B's link");
+  if (!ownLinkIds.includes(linkA.link.id)) problems.push("control: A's link is not listed");
+  const bLinks = (await (await call(baseUrl, b, "GET", "/api/share-links")).json()) as {
+    links?: { id: string; revokedAt: number | null }[];
+  };
+  if (bLinks.links?.find((l) => l.id === linkB.link.id)?.revokedAt !== null) {
+    problems.push("B's share link was revoked or lost");
+  }
+
+  // A link token opens its own Document and nothing else, whatever else the request names.
+  const visit = (url: string, init: RequestInit = {}) => fetch(new URL(url, baseUrl), init);
+  for (const variant of [
+    { path: `/api/share/${linkA.url.slice(3)}/content`, init: {} },
+    {
+      path: `/api/share/${linkA.url.slice(3)}/content?documentId=${sharedB.document.id}&tenant=${b.tenantId}`,
+      init: { headers: asB },
+    },
+  ]) {
+    const res = await visit(variant.path, variant.init);
+    const bytes = await res.arrayBuffer();
+    if (res.status !== 200 || (await sha256Hex(bytes)) !== docA.sha256) {
+      problems.push(`A's link served something other than A's Document at ${variant.path}`);
+    }
+  }
+  const viaB = await visit(`/api/share/${linkB.url.slice(3)}/content`);
+  if ((await sha256Hex(await viaB.arrayBuffer())) !== sharedB.document.sha256) {
+    problems.push("control: B's link did not serve B's shared Document");
+  }
   const docsAfter = { a: await countDocs(a, folderA), b: await countDocs(b, folderB) };
   if (docsAfter.a !== docsBefore.a || docsAfter.b !== docsBefore.b) {
     problems.push(
