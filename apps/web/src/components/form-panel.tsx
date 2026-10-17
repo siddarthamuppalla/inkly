@@ -96,15 +96,18 @@ function FormFields({
         onSave(values, flatten);
       }}
     >
-      {fields.map((field) => (
-        <FieldInput
-          key={field.name}
-          field={field}
-          value={values[field.name] ?? field.value}
-          disabled={disabled || field.readOnly}
-          onChange={set(field.name)}
-        />
-      ))}
+      {fields.map((field) => {
+        const value = values[field.name];
+        return (
+          <FieldInput
+            key={field.name}
+            field={field}
+            value={value === undefined ? field.value : value}
+            disabled={disabled || field.readOnly}
+            onChange={set(field.name)}
+          />
+        );
+      })}
       <Check
         label="Flatten"
         hint="Draws the values into the page and removes the fields, so they can no longer be edited."

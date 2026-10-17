@@ -300,7 +300,14 @@ const J008: Journey = {
     await signedIn(ctx);
     await page.goto(new URL("/members", baseUrl).toString());
     await page.getByLabel("Email").fill(uniqueEmail("j008-free"));
+    const refused = page.waitForResponse(
+      (res) =>
+        res.request().method() === "POST" &&
+        new URL(res.url()).pathname === "/api/tenant/invitations",
+      { timeout: 30_000 },
+    );
     await page.getByRole("button", { name: "Send invitation" }).click();
+    expect((await refused).status() === 402, "the Free invitation did not return 402");
     expect(
       await visible(page.getByText("The Free plan allows 1 member")),
       "a Free workspace did not refuse a second member",

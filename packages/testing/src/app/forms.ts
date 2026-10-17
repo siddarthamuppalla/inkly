@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { PDFDocument } from "pdf-lib";
 
 import { runTool } from "../pdf/tools.ts";
 import { verifyFile } from "../pdf/verify.ts";
@@ -17,6 +18,31 @@ import { signedIn } from "./sign-in.ts";
 interface Field {
   name: string;
   value: unknown;
+}
+
+async function clearDropdown(ctx: JourneyContext) {
+  const doc = await PDFDocument.create();
+  const country = doc.getForm().createDropdown("country");
+  country.addOptions(["France", "Japan"]);
+  country.select("Japan");
+  country.addToPage(doc.addPage(), { x: 40, y: 500, width: 180, height: 25 });
+  await openDocuments(ctx);
+  await ctx.page.getByTestId("upload-input").setInputFiles({
+    name: "choice-form.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from(await doc.save()),
+  });
+  const row = ctx.page.getByTestId("document-row").filter({ hasText: "choice-form" });
+  await row.waitFor(WAIT);
+  await row.getByRole("link", { name: "choice-form" }).click();
+  await pagesRendered(ctx, 1);
+  const select = ctx.page.getByLabel("Country", { exact: true });
+  await select.selectOption("");
+  ctx.expect((await select.inputValue()) === "", "clearing a dropdown restored its saved option");
+  await ctx.checkpoint("cleared-dropdown");
+  await ctx.page.getByRole("button", { name: "Save", exact: true }).click();
+  await currentVersionIs(ctx, 2, 1);
+  ctx.expect((await select.inputValue()) === "", "the saved dropdown is not empty");
 }
 
 /** Saves the current Version's bytes, runs verify-pdf on them and reads their form and text. */
@@ -93,5 +119,6 @@ export const J009: Journey = {
     );
     expect(!v3.hasForm, "pdfinfo still reports a form on version 3");
     expect(v3.text.includes("Ada Lovelace"), "version 3's page text lacks the flattened name");
+    await clearDropdown(ctx);
   },
 };
