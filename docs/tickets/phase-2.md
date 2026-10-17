@@ -28,7 +28,7 @@ Dependency order:
 T2.1 forms ─────────────┐
 T2.2 annotations ───────┼─ T2.6 phase gate
 T2.3 share links ─ T2.4 ┘
-T2.5 bots (on hold)
+T2.5 bots (independent)
 ```
 Migration numbers are reserved per ticket: T2.3 `0008_share_links.sql`,
 T2.4 `0009_activity.sql`. T2.1 and T2.2 need no D1 migration.
@@ -99,10 +99,7 @@ links, J-012 activity.
 
 ## T2.5 (#44): Triage and PR Watcher bots
 
-**On hold (2026-10-16, Siddartha):** both bots run a Claude agent in CI, and CI no longer
-depends on `CLAUDE_CODE_OAUTH_TOKEN` (see T1.7). Revisit if a CI credential comes back.
-
-**Context:** `05_BOTS.md` (phase 2 enables Triage + PR Watcher).
+**Context:** `05_BOTS.md` (phase 2 enables Triage + PR Watcher). Same shape as the Verifier (`.github/workflows/verifier.yml`).
 **Acceptance criteria (predicates):**
 - [ ] `.github/workflows/triage.yml` runs a fresh Claude Code agent on `issues: opened` that dedupes against open issues, applies the triage labels from `docs/agents/triage-labels.md`, and either labels `ready-for-agent` with a repro and spec link or comments why not (`needs-info`/`needs-human`). Permissions: issues write, contents read.
 - [ ] `.github/workflows/pr-watcher.yml` runs on a failed CI `workflow_run` or a PR review comment on a PR from a `t/*` or `claude/*` branch, and pushes a fix or replies; it never merges, never force-pushes, never touches `main`, and skips PRs labeled `risk:high` for code changes (comment only).
@@ -114,5 +111,5 @@ depends on `CLAUDE_CODE_OAUTH_TOKEN` (see T1.7). Revisit if a CI credential come
 
 ## T2.6: Phase 2 gate
 
-- [ ] T2.1–T2.4 merged; `verify-app` J-000…J-012 green on a preview and on production after the deploy approval; `verify-tenancy` green; feature map and `GLOSSARY.md` updated.
+- [ ] T2.1–T2.5 merged; `verify-app` J-000…J-012 green on a preview and on production after the deploy approval; `verify-tenancy` green; feature map and `GLOSSARY.md` updated.
 - [ ] Hand-off note for Phase 3 posted.

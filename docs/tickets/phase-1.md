@@ -108,12 +108,6 @@ Auth internals change behind that seam only.
 
 ## T1.7: Verifier bot
 
-**Changed 2026-10-16 (Siddartha):** the Claude agent step depended on
-`CLAUDE_CODE_OAUTH_TOKEN`, which failed every run, so CI no longer uses any Claude
-credential. The `verdict` job in `ci.yml` now posts the one PASS/FAIL comment from the CI
-jobs' results, and the adversarial diff review is done by a fresh reviewer agent in the
-builder's session. The original predicates below are kept for the record.
-
 - [ ] A workflow runs a fresh Claude Code agent on each PR push that re-runs the verify skills and posts one PASS/FAIL verdict comment, updated in place; it skips with a summary line when `CLAUDE_CODE_OAUTH_TOKEN` is unset; it has read-only contents permission plus PR comments.
 - [ ] `factory-pause` on the tracking issue or `FACTORY_PAUSED=true` makes it exit before doing work.
 **Risk:** low.

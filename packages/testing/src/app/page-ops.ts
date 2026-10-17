@@ -47,32 +47,6 @@ const J006: Journey = {
       "the page list did not reset to the saved Version's order",
     );
 
-    // #53: on a real deploy the viewer has kept Version 3 after this Delete. Record what the
-    // API answered for this Document from here on, so a failure says where it went stale.
-    const docPath = new URL(page.url()).pathname.replace("/documents/", "/api/documents/");
-    const seen: string[] = [];
-    const started = Date.now();
-    page.on("response", (r) => {
-      const path = new URL(r.url()).pathname;
-      if (!path.startsWith(docPath) || path.endsWith("/content")) return;
-      void r
-        .text()
-        .catch(() => "")
-        .then((body) => {
-          const cv = /"currentVersion":(\d+)/.exec(body)?.[1];
-          const tail = path.slice(docPath.length) || "/";
-          seen.push(
-            `+${String(Date.now() - started)}ms ${r.request().method()} ${tail} ${String(r.status())}${cv ? ` v${cv}` : ""}`,
-          );
-        });
-    });
-    page.on("requestfailed", (r) => {
-      if (new URL(r.url()).pathname.startsWith(docPath)) {
-        seen.push(
-          `+${String(Date.now() - started)}ms ${r.method()} failed: ${r.failure()?.errorText ?? "?"}`,
-        );
-      }
-    });
     await page.getByRole("checkbox", { name: "Select page 10", exact: true }).check();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await reach(ctx, versions.nth(3).waitFor(WAIT), "Delete did not add Version 4");
@@ -84,7 +58,7 @@ const J006: Journey = {
         .catch(() => "")) ?? "";
     expect(
       top.includes("Version 4") && top.includes("Current") && top.includes("9 pages"),
-      `the newest version reads "${top}", expected Version 4, Current, 9 pages; API after Delete: ${seen.join(", ")}`,
+      `the newest version reads "${top}", expected Version 4, Current, 9 pages`,
     );
     await ctx.checkpoint("edited");
 

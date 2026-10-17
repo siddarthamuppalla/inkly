@@ -4,7 +4,6 @@ import AxeBuilder from "@axe-core/playwright";
 import { chromium, type LaunchOptions, type Page } from "playwright";
 
 import type { Journey } from "./journeys.ts";
-import type { RouteCoverage, SeenRequest } from "./route-coverage.ts";
 
 export interface JourneyResult {
   readonly id: string;
@@ -19,8 +18,6 @@ export interface JourneyResult {
   /** 4xx responses the journey declared as designed outcomes; reported, never failed on. */
   readonly expectedClientErrors: readonly string[];
   readonly artifacts: readonly string[];
-  /** Every response from the target, for route coverage. */
-  readonly requests: readonly SeenRequest[];
 }
 
 export interface RunInfo {
@@ -28,7 +25,6 @@ export interface RunInfo {
   readonly baseUrl: string;
   readonly outDir: string;
   readonly notes: readonly string[];
-  readonly coverage?: readonly RouteCoverage[];
 }
 
 /** WCAG 2.0, 2.1 and 2.2, levels A and AA: the bar Inkly holds itself to. */
@@ -77,8 +73,6 @@ export async function runJourneys(
       const failedRequests: string[] = [];
       const expectedClientErrors: string[] = [];
       const artifacts: string[] = [];
-      const requests: SeenRequest[] = [];
-      const origin = new URL(baseUrl).origin;
       const context = await browser.newContext();
       await context.tracing.start({ screenshots: true, snapshots: true });
       const page = await context.newPage();
@@ -93,10 +87,6 @@ export async function runJourneys(
       page.on("pageerror", (e) => consoleErrors.push(`uncaught: ${e.message}`));
       context.on("response", (r) => {
         if (r.status() >= 500) serverErrors.push(`${String(r.status())} ${r.url()}`);
-        const url = new URL(r.url());
-        if (url.origin === origin) {
-          requests.push({ method: r.request().method(), path: url.pathname, status: r.status() });
-        }
       });
       context.on("requestfailed", (r) => {
         failedRequests.push(`${r.url()}: ${r.failure()?.errorText ?? "failed"}`);
@@ -149,7 +139,6 @@ export async function runJourneys(
         failedRequests,
         expectedClientErrors,
         artifacts,
-        requests,
       });
     }
   } finally {
@@ -186,22 +175,6 @@ export function writeSummary(info: RunInfo, results: readonly JourneyResult[]): 
       ...r.expectedClientErrors.map((e) => `- expected 4xx: ${e}`),
     ];
     if (details.length > 0) lines.push("", `## ${r.id}`, "", ...details);
-  }
-  if (info.coverage) {
-    const missed = info.coverage.filter((c) => c.hits === 0).length;
-    lines.push(
-      "",
-      "## API route coverage",
-      "",
-      `${String(info.coverage.length - missed)} of ${String(info.coverage.length)} routes got a successful request from a journey.`,
-      "",
-      "| Route | Requests | Journeys |",
-      "|-------|---------:|----------|",
-      ...info.coverage.map(
-        (c) =>
-          `| ${c.hits === 0 ? "❌ " : ""}\`${c.route.method} ${c.route.path}\` | ${String(c.hits)} | ${c.journeys.join(", ")} |`,
-      ),
-    );
   }
   const file = join(info.outDir, "summary.md");
   writeFileSync(file, `${lines.join("\n")}\n`);

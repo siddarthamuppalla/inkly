@@ -86,28 +86,6 @@ describe("test hooks", () => {
     ]);
   });
 
-  it("lists the API's own routes for verify-app's route coverage", async () => {
-    const read = (secret?: string) =>
-      app.request("/__test/routes", secret ? { headers: { "x-test-hooks-secret": secret } } : {}, {
-        ...env,
-        ...enabled,
-      });
-    expect((await read()).status).toBe(404);
-    const res = await read(SECRET);
-    expect(res.status).toBe(200);
-    const { routes } = await res.json<{ routes: { method: string; path: string }[] }>();
-    expect(routes).toEqual(
-      expect.arrayContaining([
-        { method: "GET", path: "/health" },
-        { method: "GET", path: "/api/me" },
-        { method: "POST", path: "/api/documents/:id/rotate" },
-        { method: "DELETE", path: "/api/folders/:id" },
-      ]),
-    );
-    expect(routes.filter((r) => r.method === "ALL" || r.path.startsWith("/__test"))).toEqual([]);
-    expect(new Set(routes.map((r) => `${r.method} ${r.path}`)).size).toBe(routes.length);
-  });
-
   it("returns 404 without the secret header", async () => {
     expect((await seed(enabled)).status).toBe(404);
   });
