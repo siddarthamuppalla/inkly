@@ -25,3 +25,8 @@ const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 export function isWellFormedId(raw: string): boolean {
   return ID_PATTERN.test(raw);
 }
+
+declare const shareLinkIdBrand: unique symbol;
+
+/** A Share link's identifier, unique within its Tenant. Not its secret token. */
+export type ShareLinkId = string & { readonly [shareLinkIdBrand]: true };

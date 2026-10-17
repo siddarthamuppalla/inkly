@@ -130,8 +130,18 @@ export async function accessLog(tenantId: string) {
     { headers: { "x-test-hooks-secret": SECRET } },
     hooks,
   );
-  return (await res.json<{ entries: { action: string; status: number; resource: string }[] }>())
-    .entries;
+  return (
+    await res.json<{
+      entries: {
+        action: string;
+        status: number;
+        resource: string;
+        shareLinkId: string | null;
+        ip: string | null;
+        userAgent: string | null;
+      }[];
+    }>()
+  ).entries;
 }
 
 export function uniqueEmail(label: string): string {

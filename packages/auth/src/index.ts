@@ -34,3 +34,16 @@ export {
   type Me,
   type TenantSummary,
 } from "./workspace.ts";
+export {
+  hashSharePassword,
+  issueShareGrant,
+  mintShareLinkId,
+  mintShareToken,
+  resolveShareLink,
+  shareLinkUnlocked,
+  unlockAttemptAllowed,
+  verifySharePassword,
+  UNLOCK_ATTEMPT_LIMIT,
+  type GoneShareLink,
+  type OpenShareLink,
+} from "./share-links.ts";

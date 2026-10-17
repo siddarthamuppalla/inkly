@@ -17,7 +17,9 @@ its own folder and Document. Then A tries to reach B's data every known way:
 - by reading and filling B's form fields;
 - by uploading into, nesting under, renaming, moving into and deleting B's folder;
 - by listing, adding, recoloring, deleting, commenting on and resolving B's Annotations,
-  downloading B's Document with annotations, and opening B's live annotations WebSocket.
+  downloading B's Document with annotations, and opening B's live annotations WebSocket;
+- by sharing B's Document, listing B's Share links and revoking B's link; and it checks
+  that A's link token serves A's Document only, whatever tenant or Document the request names.
 
 Pass means every attempt returned 403 or 404. A's access log must hold exactly one
 denial entry per denied attempt, and B's Documents and folders must be unchanged.
@@ -50,6 +52,7 @@ or check failure. For `--self-test`, `0` means the leak was caught.
 
 ## What it attacks today
 `/api/documents` (`workers/api/src/documents.ts`), its Annotation routes and
-DocSession WebSocket (`workers/api/src/annotations.ts`) and `/api/folders`
-(`workers/api/src/folders.ts`). Add cases to `attack.ts` when a new tenant-scoped
+DocSession WebSocket (`workers/api/src/annotations.ts`), `/api/folders`
+(`workers/api/src/folders.ts`), and `/api/share-links` and `/api/share/:token`
+(`workers/api/src/share-links.ts`). Add cases to `attack.ts` when a new tenant-scoped
 route ships.
