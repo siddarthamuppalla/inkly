@@ -11,6 +11,8 @@ export interface AnnotationsState {
   readonly meId: string;
   readonly role: string;
   readonly canWrite: boolean;
+  /** False while the Document is in Trash: the API serves no Annotations for it. */
+  readonly available: boolean;
   /** Every Annotation of the Document, oldest first, across Versions. */
   readonly annotations: readonly Annotation[];
   readonly api: ReturnType<typeof annotationsApi>;
@@ -43,8 +45,9 @@ export function AnnotationsProvider({
   readonly children: ReactNode;
 }) {
   const me = useMe();
+  const available = doc.deletedAt === null;
   const query = useAnnotations(doc.id);
-  const { members } = useDocSession(doc.id);
+  const { members } = useDocSession(doc.id, available);
   const [tool, setTool] = useState<Tool>("select");
   const [color, setColor] = useState<AnnotationColor>("yellow");
   const [selected, select] = useState<string | null>(null);
@@ -56,8 +59,9 @@ export function AnnotationsProvider({
       doc,
       meId: me?.user.id ?? "",
       role,
-      canWrite: role !== "viewer",
-      annotations: query.data ?? [],
+      canWrite: available && role !== "viewer",
+      available,
+      annotations: available ? (query.data ?? []) : [],
       api: annotationsApi(doc.id),
       members,
       tool,
@@ -69,7 +73,7 @@ export function AnnotationsProvider({
       pendingNote,
       setPendingNote,
     }),
-    [doc, me, role, query.data, members, tool, color, selected, pendingNote],
+    [doc, me, role, available, query.data, members, tool, color, selected, pendingNote],
   );
   return <Context.Provider value={state}>{children}</Context.Provider>;
 }

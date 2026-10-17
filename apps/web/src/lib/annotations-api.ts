@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import type { z } from "zod";
 
 import { ApiError } from "./api.ts";
-import { queryClient } from "./queries.ts";
+import { keys, queryClient } from "./queries.ts";
 
 export const annotationsKey = (documentId: string) => ["annotations", documentId] as const;
 
@@ -66,7 +66,8 @@ export function annotationsApi(documentId: string) {
     return annotation;
   };
   return {
-    list: async () => (await call(AnnotationListResponse, base)).annotations,
+    list: async (signal?: AbortSignal) =>
+      (await call(AnnotationListResponse, base, signal ? { signal } : {})).annotations,
     create: (shape: AnnotationShape) => saved(call(AnnotationResponse, base, send("POST", shape))),
     edit: (id: string, patch: AnnotationPatch) =>
       saved(call(AnnotationResponse, `${base}/${id}`, send("PATCH", patch))),
@@ -92,10 +93,29 @@ export function annotationsApi(documentId: string) {
   };
 }
 
+/**
+ * Marks the Document as on its way to Trash and aborts Annotation reads in flight: the API
+ * answers 404 for a Trashed Document's Annotations.
+ */
+export async function leaveForTrash(doc: { id: string }): Promise<void> {
+  queryClient.setQueryData<{ deletedAt: number | null }>(keys.document(doc.id), (d) =>
+    d ? { ...d, deletedAt: Date.now() } : d,
+  );
+  await queryClient.cancelQueries({ queryKey: annotationsKey(doc.id) });
+}
+
+/** A Trashed Document has no Annotations to fetch; the API answers 404. */
+function inTrash(documentId: string): boolean {
+  const doc = queryClient.getQueryData<{ deletedAt: number | null }>(keys.document(documentId));
+  return doc !== undefined && doc.deletedAt !== null;
+}
+
 export function useAnnotations(documentId: string) {
   return useQuery({
     queryKey: annotationsKey(documentId),
-    queryFn: () => annotationsApi(documentId).list(),
+    queryFn: ({ signal }) => annotationsApi(documentId).list(signal),
+    // Read at each (re)fetch, so a Document trashed a moment ago is not asked for again.
+    enabled: () => !inTrash(documentId),
   });
 }
 
@@ -106,11 +126,15 @@ const MAX_BACKOFF_MS = 10_000;
  * Keeps a WebSocket to the Document's DocSession open: changes from other viewers land in
  * the annotations cache, and `members` says who has the Document open right now.
  */
-export function useDocSession(documentId: string): { members: Author[]; live: boolean } {
+export function useDocSession(
+  documentId: string,
+  enabled: boolean,
+): { members: Author[]; live: boolean } {
   const [members, setMembers] = useState<Author[]>([]);
   const [live, setLive] = useState(false);
 
   useEffect(() => {
+    if (!enabled) return;
     let socket: WebSocket | undefined;
     let ping: ReturnType<typeof setInterval> | undefined;
     let retry: ReturnType<typeof setTimeout> | undefined;
@@ -157,7 +181,7 @@ export function useDocSession(documentId: string): { members: Author[]; live: bo
       clearTimeout(retry);
       socket?.close(1000, "left the document");
     };
-  }, [documentId]);
+  }, [documentId, enabled]);
 
   return { members, live };
 }

@@ -18,10 +18,11 @@ import { Field } from "../components/ui/field.tsx";
 import { Sheet, SheetBody, SheetHeader, SheetTitle } from "../components/ui/sheet.tsx";
 import { UploadButton, UploadStatus, useUpload } from "../components/upload.tsx";
 import { ApiError } from "../lib/api.ts";
+import { leaveForTrash } from "../lib/annotations-api.ts";
 import { documentsApi } from "../lib/documents-api.ts";
 import { folderChoices, folderPath } from "../lib/folders.ts";
 import { formatBytes, formatDateTime, formatPages } from "../lib/format.ts";
-import { keys, refreshAll, useFolders } from "../lib/queries.ts";
+import { keys, queryClient, refreshAll, useFolders } from "../lib/queries.ts";
 
 /** Saves fetched bytes, so a download carries the same credentials as every API call. */
 function saveFile(blob: Blob, filename: string) {
@@ -156,11 +157,16 @@ function Actions({ doc }: { readonly doc: DocumentInfo }) {
   const navigate = useNavigate();
   const trashed = doc.deletedAt !== null;
   const trash = useMutation({
-    mutationFn: () =>
-      trashed ? documentsApi.restoreDocument(doc.id) : documentsApi.trashDocument(doc.id),
-    onSuccess: async () => {
+    mutationFn: (toTrash: boolean) =>
+      toTrash ? documentsApi.trashDocument(doc.id) : documentsApi.restoreDocument(doc.id),
+    onMutate: async (toTrash) => {
+      if (toTrash) await leaveForTrash(doc);
+    },
+    onError: refreshAll,
+    onSuccess: async (updated, toTrash) => {
+      queryClient.setQueryData(keys.document(doc.id), updated);
       await refreshAll();
-      if (!trashed) await navigate(doc.folderId ? `/?folder=${doc.folderId}` : "/");
+      if (toTrash) await navigate(doc.folderId ? `/?folder=${doc.folderId}` : "/");
     },
   });
   const { state, upload } = useUpload({ documentId: doc.id });
@@ -203,7 +209,7 @@ function Actions({ doc }: { readonly doc: DocumentInfo }) {
             variant={trashed ? "secondary" : "destructive"}
             loading={trash.isPending}
             onClick={() => {
-              trash.mutate();
+              trash.mutate(!trashed);
             }}
           >
             {trashed ? "Restore from Trash" : "Move to Trash"}

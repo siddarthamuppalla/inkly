@@ -74,13 +74,28 @@ function TextArea({
 /** Presence, drawing tools, every Annotation's Comment thread and the annotated download. */
 export function CommentsPanel() {
   const state = useAnnotationsState();
-  const { doc, annotations, members, meId, canWrite } = state;
+  const { doc, annotations, members, meId, canWrite, available } = state;
   const others = members.filter((m) => m.id !== meId);
   const download = useMutation({
     mutationFn: async () => {
       saveFile(await state.api.annotatedPdf(), `${doc.title} (annotated).pdf`);
     },
   });
+
+  if (!available) {
+    return (
+      <Sheet>
+        <SheetHeader>
+          <SheetTitle className="text-xl">Comments</SheetTitle>
+        </SheetHeader>
+        <SheetBody>
+          <p className="text-sm text-muted-foreground">
+            Annotations and comments come back when this document is restored from Trash.
+          </p>
+        </SheetBody>
+      </Sheet>
+    );
+  }
 
   return (
     <Sheet>
