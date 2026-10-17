@@ -1,6 +1,6 @@
-import { mayChangeAnnotation } from "@inkly/auth";
+import { expireSeededSession, mayChangeAnnotation } from "@inkly/auth";
 import type { Annotation, AnnotationShape, DocumentInfo, LiveMessage } from "@inkly/domain";
-import { listDurableObjectIds } from "cloudflare:test";
+import { listDurableObjectIds, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
@@ -9,6 +9,8 @@ import {
   accessLog,
   as,
   json,
+  hooks,
+  ORIGIN,
   outbox,
   seed,
   uniqueEmail,
@@ -291,6 +293,106 @@ describe("the live channel", () => {
     watcher.ws.close(1000, "bye");
   });
 
+  it.each(["membership removed", "signed out", "expired", "trashed", "legacy attachment"] as const)(
+    "stops an existing live channel after access is %s",
+    async (reason) => {
+      const { owner, doc, viewer } = await team();
+      const annotation = await add(owner, doc, highlight);
+      const watcher = await live(viewer, doc);
+      await watcher.next((m) => m.type === "presence");
+      watcher.messages.length = 0;
+      const closed = new Promise<number>((resolve) => {
+        watcher.ws.addEventListener("close", (event) => {
+          resolve(event.code);
+        });
+      });
+      if (reason === "membership removed") {
+        expect(
+          (await as(owner, `/api/tenant/members/${viewer.userId}`, { method: "DELETE" })).status,
+        ).toBe(204);
+      } else if (reason === "signed out") {
+        expect((await as(viewer, "/api/auth/sign-out", { method: "POST" })).status).toBe(200);
+      } else if (reason === "trashed") {
+        expect((await as(owner, `/api/documents/${doc.id}`, { method: "DELETE" })).status).toBe(
+          200,
+        );
+      }
+      if (reason === "legacy attachment") {
+        const session = env.DOC_SESSIONS.get(
+          env.DOC_SESSIONS.idFromName(`${owner.tenantId}/${doc.id}`),
+        );
+        await runInDurableObject(session, (_instance, state) => {
+          for (const ws of state.getWebSockets())
+            ws.serializeAttachment({ id: viewer.userId, name: "Vic Viewer" });
+        });
+      }
+      if (reason === "expired") {
+        await expireSeededSession(new Request(ORIGIN), hooks, viewer.token);
+      }
+      try {
+        const session = env.DOC_SESSIONS.get(
+          env.DOC_SESSIONS.idFromName(`${owner.tenantId}/${doc.id}`),
+        );
+        await session.setResolved(annotation.id, true);
+        expect(await closed).toBe(1008);
+        expect(watcher.messages.filter((m) => m.type === "annotation")).toEqual([]);
+        expect(watcher.ws.readyState).toBe(WebSocket.CLOSED);
+      } finally {
+        watcher.ws.close();
+      }
+    },
+  );
+
+  it("refuses annotation reads, writes, downloads and upgrades for a trashed Document", async () => {
+    const { owner, doc } = await team();
+    await as(owner, `/api/documents/${doc.id}`, { method: "DELETE" });
+    const base = `/api/documents/${doc.id}`;
+    const responses = [
+      await as(owner, `${base}/annotations`),
+      await as(owner, `${base}/annotations`, json("POST", highlight)),
+      await as(owner, `${base}/annotated-content`),
+      await as(owner, `${base}/annotations/live`, { headers: { upgrade: "websocket" } }),
+    ];
+    expect(responses.map((res) => res.status)).toEqual([404, 404, 404, 404]);
+    for (const res of responses) res.webSocket?.close();
+  });
+
+  it("retains no credential and refuses an identity scoped to a different DocSession", async () => {
+    const { owner, doc } = await team();
+    const watcher = await live(owner, doc);
+    const session = env.DOC_SESSIONS.get(
+      env.DOC_SESSIONS.idFromName(`${owner.tenantId}/${doc.id}`),
+    );
+    const identity = await runInDurableObject(
+      session,
+      (_instance, state) =>
+        state.getWebSockets()[0]?.deserializeAttachment() as Record<string, unknown>,
+    );
+    expect(Object.keys(identity).sort()).toEqual([
+      "author",
+      "documentId",
+      "sessionId",
+      "tenantId",
+      "userId",
+    ]);
+    expect(identity).toMatchObject({
+      userId: owner.userId,
+      tenantId: owner.tenantId,
+      documentId: doc.id,
+    });
+    expect(JSON.stringify(identity)).not.toContain(owner.token);
+    const other = await uploaded(owner, "tiny.pdf");
+    const wrongSession = env.DOC_SESSIONS.get(
+      env.DOC_SESSIONS.idFromName(`${owner.tenantId}/${other.id}`),
+    );
+    const response = await wrongSession.fetch("https://doc-session/live", {
+      headers: { upgrade: "websocket", "x-inkly-actor": JSON.stringify(identity) },
+    });
+    expect(response.status).toBe(404);
+    expect(response.webSocket).toBeNull();
+    watcher.ws.close();
+  });
+
   it("refuses a plain GET on the live URL with 426", async () => {
     const { owner, doc } = await team();
     expect((await as(owner, `/api/documents/${doc.id}/annotations/live`)).status).toBe(426);
@@ -315,7 +417,9 @@ describe("download with annotations", () => {
       versions: unknown[];
     }>();
     expect(versions.versions).toHaveLength(1);
-    const granted = (await accessLog(owner.tenantId)).filter((e) => e.status === 200);
+    const granted = (await accessLog(owner.tenantId)).filter(
+      (e) => e.status === 200 && e.action === "read-content",
+    );
     expect(granted.map((e) => e.resource)).toEqual([`document ${doc.id} v1 with annotations`]);
   });
 

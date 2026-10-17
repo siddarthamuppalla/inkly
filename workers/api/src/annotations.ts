@@ -44,7 +44,7 @@ async function actorOf(c: TenantContext): Promise<Actor> {
 async function target(c: TenantContext) {
   const doc = await findDocument(c);
   const aid = c.req.param("aid");
-  if (!doc || (aid !== undefined && !isWellFormedId(aid))) return null;
+  if (!doc || doc.deletedAt !== null || (aid !== undefined && !isWellFormedId(aid))) return null;
   return { doc, session: docSession(c.env, c.get("tenantId"), doc), aid: aid ?? "" };
 }
 
@@ -89,7 +89,16 @@ annotationRoutes.get("/:id/annotations/live", async (c) => {
     return c.json({ error: "upgrade_required", message: "Open this URL as a WebSocket" }, 426);
   }
   return t.session.fetch("https://doc-session/live", {
-    headers: { upgrade: "websocket", [ACTOR_HEADER]: JSON.stringify(await actorOf(c)) },
+    headers: {
+      upgrade: "websocket",
+      [ACTOR_HEADER]: JSON.stringify({
+        author: { id: c.get("session").userId, name: (await actorOf(c)).name },
+        sessionId: c.get("session").sessionId,
+        userId: c.get("session").userId,
+        tenantId: c.get("tenantId"),
+        documentId: t.doc.id,
+      }),
+    },
   });
 });
 

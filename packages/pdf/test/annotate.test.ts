@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AppError, type Annotation, type AnnotationShape } from "@inkly/domain";
 import { verifyFile } from "@inkly/testing";
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber } from "pdf-lib";
+import { degrees, PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber } from "pdf-lib";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { withAnnotations } from "../src/index.ts";
@@ -146,6 +146,69 @@ describe("withAnnotations", () => {
       expect(b - r, `top-left quadrant is rgb(${String([r, g, b])})`).toBeGreaterThan(40);
       const [r2, , b2] = pixel(bytes, page, 0.75, 0.75);
       expect(Math.abs(b2 - r2), "bottom-right quadrant stays unmarked").toBeLessThan(20);
+    },
+  );
+
+  it.each([
+    [0, [120, 470], [120, 350, 160, 470], [280, 230]],
+    [90, [160, 170], [160, 170, 240, 230], [320, 410]],
+    [180, [360, 230], [320, 230, 360, 350], [200, 470]],
+    [270, [320, 530], [240, 470, 320, 530], [160, 290]],
+  ] as const)(
+    "anchors every shape to an offset CropBox rotated %i degrees",
+    async (angle, anchor, rectangle, end) => {
+      const source = await PDFDocument.create();
+      const page = source.addPage([600, 800]);
+      page.setCropBox(40, 50, 400, 600);
+      page.setRotation(degrees(angle));
+      const bytes = await withAnnotations(await source.save(), [
+        highlight(1, 0.2, 0.3, 0.1, 0.2),
+        annotation({
+          kind: "note",
+          page: 1,
+          color: "blue",
+          at: { x: 0.2, y: 0.3 },
+          text: "Crop anchor",
+        }),
+        annotation({
+          kind: "ink",
+          page: 1,
+          color: "red",
+          strokes: [
+            [
+              { x: 0.2, y: 0.3 },
+              { x: 0.6, y: 0.7 },
+            ],
+          ],
+        }),
+      ]);
+      const annotated = await PDFDocument.load(bytes);
+      const refs = annotated.getPage(0).node.Annots()?.asArray() ?? [];
+      const numbers = (dict: PDFDict, key: string) =>
+        dict
+          .lookup(PDFName.of(key), PDFArray)
+          .asArray()
+          .map((value) => (value as PDFNumber).asNumber());
+      const dictionaries = refs.map((ref) => annotated.context.lookup(ref, PDFDict));
+      const [h, n, i] = dictionaries;
+      if (!h || !n || !i) throw new Error("missing PDF annotations");
+      numbers(h, "Rect").forEach((value, index) => {
+        expect(value).toBeCloseTo(rectangle[index] ?? 0);
+      });
+      const [x, y] = anchor;
+      numbers(n, "Rect").forEach((value, index) => {
+        expect(value).toBeCloseTo([x, y - 24, x + 24, y][index] ?? 0);
+      });
+      const stroke = i
+        .lookup(PDFName.of("InkList"), PDFArray)
+        .lookup(0, PDFArray)
+        .asArray()
+        .map((value) => (value as PDFNumber).asNumber());
+      stroke.forEach((value, index) => {
+        expect(value).toBeCloseTo([...anchor, ...end][index] ?? 0);
+      });
+      expect(annotated.getPage(0).getCropBox()).toEqual({ x: 40, y: 50, width: 400, height: 600 });
+      expect(annotated.getPage(0).getRotation().angle).toBe(angle);
     },
   );
 

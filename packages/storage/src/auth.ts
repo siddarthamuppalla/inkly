@@ -115,3 +115,17 @@ export async function countWindowHit(
   await env.KV.put(kvKey, JSON.stringify(next), { expirationTtl: ttlSeconds });
   return next.count;
 }
+
+/** Only the non-secret expiry of this exact session and User. */
+export async function findSessionExpiry(
+  env: StorageEnv,
+  sessionId: string,
+  userId: string,
+): Promise<number | string | null> {
+  const row = await env.DB.prepare(
+    "SELECT expires_at AS expiresAt FROM sessions WHERE id = ?1 AND user_id = ?2",
+  )
+    .bind(sessionId, userId)
+    .first<{ expiresAt: number | string }>();
+  return row?.expiresAt ?? null;
+}

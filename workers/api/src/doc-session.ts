@@ -1,21 +1,23 @@
-import { mayChangeAnnotation, type Role } from "@inkly/auth";
+import { liveSessionActive, mayChangeAnnotation, type Role, type Session } from "@inkly/auth";
 import {
   AnnotationShape,
   type Annotation,
   type AnnotationPatch,
   type Author,
   type Comment,
+  type DocumentId,
   type LiveMessage,
   type TenantId,
 } from "@inkly/domain";
-import type { DocumentRow } from "@inkly/storage";
+import { getDocument, type DocumentRow } from "@inkly/storage";
 import { DurableObject } from "cloudflare:workers";
 
 import type { Env } from "./env.ts";
 
 // DocSession (GLOSSARY): one per Document, named `{tenantId}/{documentId}`, the single
 // writer of its Annotations and Comments. Only the API Worker holds the binding, and it
-// calls in only after requireTenant and a Document lookup, so the DO trusts its Actor.
+// calls in only after requireTenant and a Document lookup. Live recipients are reauthorized
+// before each outbound frame because an open socket can outlive that initial access.
 
 export interface Actor {
   readonly userId: string;
@@ -32,8 +34,25 @@ export function docSession(env: Env, tenantId: TenantId, doc: DocumentRow) {
   return env.DOC_SESSIONS.get(env.DOC_SESSIONS.idFromName(`${tenantId}/${doc.id}`));
 }
 
-/** Header carrying the Actor on the WebSocket upgrade the API Worker forwards. */
+/** Header carrying scoped live identity on the private upgrade forwarded by the API. */
 export const ACTOR_HEADER = "x-inkly-actor";
+
+interface LiveIdentity extends Pick<Session, "sessionId" | "userId" | "tenantId"> {
+  readonly author: Author;
+  readonly documentId: DocumentId;
+}
+
+function isLiveIdentity(value: Partial<LiveIdentity> | null): value is LiveIdentity {
+  return (
+    value !== null &&
+    typeof value.sessionId === "string" &&
+    typeof value.userId === "string" &&
+    typeof value.tenantId === "string" &&
+    typeof value.documentId === "string" &&
+    value.author?.id === value.userId &&
+    typeof value.author.name === "string"
+  );
+}
 
 interface AnnotationRow extends Record<string, SqlStorageValue> {
   id: string;
@@ -113,7 +132,7 @@ export class DocSession extends DurableObject<Env> {
       );
   }
 
-  create(actor: Actor, version: number, shape: AnnotationShape): Annotation {
+  async create(actor: Actor, version: number, shape: AnnotationShape): Promise<Annotation> {
     const id = crypto.randomUUID();
     const now = Date.now();
     this.sql.exec(
@@ -129,7 +148,7 @@ export class DocSession extends DurableObject<Env> {
     return this.changed(id);
   }
 
-  edit(actor: Actor, id: string, patch: AnnotationPatch): Outcome<Annotation> {
+  async edit(actor: Actor, id: string, patch: AnnotationPatch): Promise<Outcome<Annotation>> {
     const row = this.row(id);
     if (!row) return refuse("not_found");
     if (!mayChangeAnnotation(actor, row.author_id, "edit")) return refuse("forbidden");
@@ -146,10 +165,10 @@ export class DocSession extends DurableObject<Env> {
       Date.now(),
       id,
     );
-    return { ok: true, value: this.changed(id) };
+    return { ok: true, value: await this.changed(id) };
   }
 
-  remove(actor: Actor, id: string): Outcome<null> {
+  async remove(actor: Actor, id: string): Promise<Outcome<null>> {
     const row = this.row(id);
     if (!row) return refuse("not_found");
     if (!mayChangeAnnotation(actor, row.author_id, "delete")) return refuse("forbidden");
@@ -157,11 +176,11 @@ export class DocSession extends DurableObject<Env> {
       this.sql.exec("DELETE FROM comments WHERE annotation_id = ?", id);
       this.sql.exec("DELETE FROM annotations WHERE id = ?", id);
     });
-    this.broadcast({ type: "deleted", id });
+    await this.broadcast({ type: "deleted", id });
     return { ok: true, value: null };
   }
 
-  addComment(actor: Actor, id: string, text: string): Outcome<Annotation> {
+  async addComment(actor: Actor, id: string, text: string): Promise<Outcome<Annotation>> {
     if (!this.row(id)) return refuse("not_found");
     this.sql.exec(
       "INSERT INTO comments (id, annotation_id, author_id, author_name, text, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -172,29 +191,37 @@ export class DocSession extends DurableObject<Env> {
       text,
       Date.now(),
     );
-    return { ok: true, value: this.changed(id) };
+    return { ok: true, value: await this.changed(id) };
   }
 
-  setResolved(id: string, resolved: boolean): Outcome<Annotation> {
+  async setResolved(id: string, resolved: boolean): Promise<Outcome<Annotation>> {
     if (!this.row(id)) return refuse("not_found");
     this.sql.exec(
       "UPDATE annotations SET resolved_at = ? WHERE id = ?",
       resolved ? Date.now() : null,
       id,
     );
-    return { ok: true, value: this.changed(id) };
+    return { ok: true, value: await this.changed(id) };
   }
 
   /** The live channel: a hibernating WebSocket that receives every change and presence. */
-  override fetch(request: Request): Response {
-    const actor = JSON.parse(request.headers.get(ACTOR_HEADER) ?? "null") as Actor | null;
-    if (request.headers.get("upgrade") !== "websocket" || !actor) {
+  override async fetch(request: Request): Promise<Response> {
+    const identity = JSON.parse(
+      request.headers.get(ACTOR_HEADER) ?? "null",
+    ) as Partial<LiveIdentity> | null;
+    if (request.headers.get("upgrade") !== "websocket" || !isLiveIdentity(identity)) {
       return new Response("expected a WebSocket upgrade", { status: 426 });
+    }
+    const expected = this.env.DOC_SESSIONS.idFromName(
+      `${identity.tenantId}/${identity.documentId}`,
+    );
+    if (!expected.equals(this.ctx.id) || !(await this.allowed(identity))) {
+      return new Response("not found", { status: 404 });
     }
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ id: actor.userId, name: actor.name } satisfies Author);
-    this.broadcastPresence();
+    server.serializeAttachment(identity);
+    await this.broadcastPresence();
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -203,17 +230,17 @@ export class DocSession extends DurableObject<Env> {
     return;
   }
 
-  override webSocketClose(ws: WebSocket, code: number, reason: string): void {
+  override async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
     try {
       ws.close(code, reason);
     } catch {
       // already closed by the runtime
     }
-    this.broadcastPresence(ws);
+    await this.broadcastPresence(ws);
   }
 
-  override webSocketError(ws: WebSocket): void {
-    this.broadcastPresence(ws);
+  override async webSocketError(ws: WebSocket): Promise<void> {
+    await this.broadcastPresence(ws);
   }
 
   private row(id: string): AnnotationRow | undefined {
@@ -234,7 +261,7 @@ export class DocSession extends DurableObject<Env> {
   }
 
   /** Reads `id` back after a write and sends it to every open viewer. */
-  private changed(id: string): Annotation {
+  private async changed(id: string): Promise<Annotation> {
     const row = this.row(id);
     if (!row) throw new Error(`annotation ${id} vanished during its write`);
     const comments = this.sql
@@ -244,14 +271,34 @@ export class DocSession extends DurableObject<Env> {
       )
       .toArray();
     const annotation = this.toAnnotation(row, comments);
-    this.broadcast({ type: "annotation", annotation });
+    await this.broadcast({ type: "annotation", annotation });
     return annotation;
   }
 
-  private broadcast(message: LiveMessage, except?: WebSocket): void {
+  private async allowed(identity: LiveIdentity): Promise<boolean> {
+    const [active, doc] = await Promise.all([
+      liveSessionActive(identity, this.env),
+      getDocument(identity.tenantId, this.env, identity.documentId),
+    ]);
+    return active && doc !== null && doc.deletedAt === null;
+  }
+
+  private async recipients(except?: WebSocket): Promise<WebSocket[]> {
+    const sockets = await Promise.all(
+      this.ctx.getWebSockets().map(async (ws) => {
+        if (ws === except || ws.readyState !== WebSocket.OPEN) return null;
+        const identity = ws.deserializeAttachment() as Partial<LiveIdentity> | null;
+        if (isLiveIdentity(identity) && (await this.allowed(identity))) return ws;
+        ws.close(1008, "Access ended");
+        return null;
+      }),
+    );
+    return sockets.filter((ws): ws is WebSocket => ws !== null);
+  }
+
+  private send(sockets: readonly WebSocket[], message: LiveMessage): void {
     const text = JSON.stringify(message);
-    for (const ws of this.ctx.getWebSockets()) {
-      if (ws === except) continue;
+    for (const ws of sockets) {
       try {
         ws.send(text);
       } catch {
@@ -260,13 +307,19 @@ export class DocSession extends DurableObject<Env> {
     }
   }
 
-  private broadcastPresence(closing?: WebSocket): void {
+  private async broadcast(message: LiveMessage): Promise<void> {
+    await this.ctx.blockConcurrencyWhile(async () => {
+      this.send(await this.recipients(), message);
+    });
+  }
+
+  private async broadcastPresence(closing?: WebSocket): Promise<void> {
+    const sockets = await this.recipients(closing);
     const members = new Map<string, Author>();
-    for (const ws of this.ctx.getWebSockets()) {
-      if (ws === closing) continue;
-      const who = ws.deserializeAttachment() as Author | null;
-      if (who) members.set(who.id, who);
+    for (const ws of sockets) {
+      const identity = ws.deserializeAttachment() as LiveIdentity;
+      members.set(identity.author.id, identity.author);
     }
-    this.broadcast({ type: "presence", members: [...members.values()] }, closing);
+    this.send(sockets, { type: "presence", members: [...members.values()] });
   }
 }
