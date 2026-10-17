@@ -139,6 +139,7 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     `/api/documents/${docA.id}/content`,
     `/api/documents/${docA.id}/versions`,
     `/api/documents/${docA.id}/versions/1/content`,
+    `/api/documents/${docA.id}/form`,
     `/api/documents?folderId=${folderA}`,
   ]) {
     const res = await call(baseUrl, a, "GET", path);
@@ -164,8 +165,8 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     return res.ok ? (((await res.json()) as { entries?: { status: number }[] }).entries ?? []) : [];
   };
   const controlLog = await logOf();
-  if (controlLog.filter((e) => e.status === 200).length !== 2) {
-    problems.push("control: A's two content reads did not leave two access-log entries");
+  if (controlLog.filter((e) => e.status === 200).length !== 3) {
+    problems.push("control: A's three content reads did not leave three access-log entries");
   }
 
   /** Documents `who` has at the top level plus in `folder`: where a merge or split would land. */
@@ -241,6 +242,13 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     { name: "fetch B's Version 1 content", method: "GET", path: `${d}/versions/1/content` },
     { name: "add a Version to B's Document", method: "POST", path: `${d}/versions`, init: pdf },
     { name: "restore B's Version 1", method: "POST", path: `${d}/versions/1/restore` },
+    { name: "read B's form fields", method: "GET", path: `${d}/form` },
+    {
+      name: "fill B's form",
+      method: "POST",
+      path: `${d}/form`,
+      init: json({ values: {}, flatten: true }),
+    },
     { name: "compress B's Document", method: "POST", path: `${d}/compress`, init: json({}) },
     {
       name: "compress B's Document claiming B's tenant",

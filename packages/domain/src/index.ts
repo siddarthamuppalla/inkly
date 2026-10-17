@@ -28,6 +28,15 @@ export {
   VersionListResponse,
 } from "./documents.ts";
 export {
+  FieldRect,
+  FormField,
+  FormFieldsResponse,
+  FormFill,
+  FormValue,
+  type FormFieldType,
+  type FormValues,
+} from "./forms.ts";
+export {
   COMPRESS_LEVELS,
   CompressLevel,
   CompressOutput,
