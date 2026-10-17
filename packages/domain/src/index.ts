@@ -59,3 +59,11 @@ export {
   ShareUnlock,
   type ShareLinkStatus,
 } from "./share-links.ts";
+export {
+  ACTIVITY_ACTIONS,
+  activityAction,
+  ActivityActor,
+  ActivityEntry,
+  ActivityResponse,
+  type ActivityAction,
+} from "./activity.ts";

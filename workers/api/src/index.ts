@@ -3,6 +3,7 @@ import { probeBindings } from "@inkly/storage/health";
 import { Hono } from "hono";
 
 import { account } from "./account.ts";
+import { activityRoutes, recordDocumentEdits } from "./activity.ts";
 import { documentRoutes } from "./documents.ts";
 import type { Env } from "./env.ts";
 import { onAppError } from "./errors.ts";
@@ -29,8 +30,10 @@ app.get("/health", async (c) => {
 app.route("/__test", testHooks);
 app.route("/api", account);
 app.use("/api/documents/*", requireTenant);
+app.use("/api/documents/*", recordDocumentEdits);
 app.route("/api/documents", pageOpRoutes);
 app.route("/api/documents", documentRoutes);
+app.route("/api/documents", activityRoutes);
 app.use("/api/folders/*", requireTenant);
 app.route("/api/folders", folderRoutes);
 app.use("/api/jobs/*", requireTenant);
