@@ -18,6 +18,7 @@ its own folder and Document. Then A tries to reach B's data every known way:
 - by uploading into, nesting under, renaming, moving into and deleting B's folder;
 - by listing, adding, recoloring, deleting, commenting on and resolving B's Annotations,
   downloading B's Document with annotations, and opening B's live annotations WebSocket;
+- by reading B's Document activity and B's Share link activity;
 - by sharing B's Document, listing B's Share links and revoking B's link; and it checks
   that A's link token serves A's Document only, whatever tenant or Document the request names.
 

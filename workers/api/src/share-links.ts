@@ -24,6 +24,8 @@ import {
   appendAccessLog,
   createShareLink,
   getDocument,
+  getShareLink,
+  listActivity,
   listShareLinks,
   openVersion,
   revokeShareLink,
@@ -32,6 +34,7 @@ import { Hono, type Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 
 import type { Env } from "./env.ts";
+import { activityPage, pageOf, refuseViewers } from "./activity.ts";
 import { parseJson } from "./errors.ts";
 import { viewersReadOnly } from "./roles.ts";
 import { denyAccess, type TenantContext, type TenantVars } from "./tenant-context.ts";
@@ -91,6 +94,26 @@ shareLinkRoutes.post("/:id/revoke", async (c) => {
   return link ? c.json({ link }) : missing(c, "write");
 });
 
+shareLinkRoutes.get("/:id/activity", async (c) => {
+  const tenantId = c.get("tenantId");
+  const id = c.req.param("id");
+  const link = isWellFormedId(id) ? await getShareLink(tenantId, c.env, id as ShareLinkId) : null;
+  if (!link) return missing(c, "list");
+  const refused = refuseViewers(c);
+  if (refused) return refused;
+  const page = pageOf(c);
+  const rows = await listActivity(
+    tenantId,
+    c.env,
+    { shareLinkId: link.id },
+    {
+      before: page.before,
+      limit: page.limit + 1,
+    },
+  );
+  return c.json(activityPage(rows, page.limit));
+});
+
 // Public: /api/share/:token
 
 type ShareContext = Context<{ Bindings: Env }>;
@@ -119,6 +142,7 @@ async function logVisit(
     actorUserId: "share-link",
     action,
     resource: `document ${link.documentId}`,
+    documentId: link.documentId,
     shareLinkId: link.linkId,
     ip: c.req.header("cf-connecting-ip") ?? null,
     userAgent: c.req.header("user-agent") ?? null,

@@ -1,5 +1,5 @@
 // verify-tenancy: as tenant A, try to reach tenant B's Documents, Versions, folders,
-// content, Share links and workspace every way we know. Every attempt must be refused (403/404) and leave an
+// content, Share links, activity and workspace every way we know. Every attempt must be refused (403/404) and leave an
 // access-log entry.
 
 import { randomBytes } from "node:crypto";
@@ -217,10 +217,13 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     const res = await fetch(new URL(`/__test/access-log?tenant=${a.tenantId}`, baseUrl), {
       headers: { "x-test-hooks-secret": secret },
     });
-    return res.ok ? (((await res.json()) as { entries?: { status: number }[] }).entries ?? []) : [];
+    return res.ok
+      ? (((await res.json()) as { entries?: { status: number; action: string }[] }).entries ?? [])
+      : [];
   };
+  // A's own writes above (its Annotation) are logged too, as edits; count only the reads.
   const controlLog = await logOf();
-  if (controlLog.filter((e) => e.status === 200).length !== 3) {
+  if (controlLog.filter((e) => e.status === 200 && e.action !== "write").length !== 3) {
     problems.push("control: A's three content reads did not leave three access-log entries");
   }
 
@@ -401,6 +404,18 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
       name: "revoke B's share link",
       method: "POST",
       path: `/api/share-links/${linkB.link.id}/revoke`,
+    },
+    { name: "read B's Document activity", method: "GET", path: `${d}/activity` },
+    {
+      name: "read B's Document activity claiming B's tenant",
+      method: "GET",
+      path: `${d}/activity`,
+      init: { headers: asB },
+    },
+    {
+      name: "read B's share link activity",
+      method: "GET",
+      path: `/api/share-links/${linkB.link.id}/activity`,
     },
     {
       name: "switch Active tenant to B",

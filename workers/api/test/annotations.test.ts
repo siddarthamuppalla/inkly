@@ -1,5 +1,11 @@
 import { expireSeededSession, mayChangeAnnotation } from "@inkly/auth";
-import type { Annotation, AnnotationShape, DocumentInfo, LiveMessage } from "@inkly/domain";
+import type {
+  ActivityResponse,
+  Annotation,
+  AnnotationShape,
+  DocumentInfo,
+  LiveMessage,
+} from "@inkly/domain";
 import { listDurableObjectIds, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { PDFDocument } from "pdf-lib";
@@ -220,6 +226,25 @@ describe("annotations", () => {
       (await as(editor, `/api/documents/${doc.id}/annotations/nope/resolve`, { method: "POST" }))
         .status,
     ).toBe(404);
+  });
+
+  it("shows Annotation and Comment writes as edits in the Document's activity", async () => {
+    const { owner, doc, editor } = await team();
+    const a = await add(editor, doc, note);
+    const path = `/api/documents/${doc.id}/annotations/${a.id}`;
+    expect((await as(editor, path, json("PATCH", { text: "Later" }))).status).toBe(200);
+    expect((await as(editor, `${path}/comments`, json("POST", { text: "Hi" }))).status).toBe(201);
+    expect((await as(editor, `${path}/resolve`, { method: "POST" })).status).toBe(200);
+    await list(editor, doc);
+
+    const res = await as(owner, `/api/documents/${doc.id}/activity`);
+    expect(res.status).toBe(200);
+    const { entries } = await res.json<ActivityResponse>();
+    const edits = entries.filter((e) => e.action === "edited");
+    expect(edits).toHaveLength(4);
+    expect(edits.map((e) => e.actor)).toEqual(
+      Array(4).fill(expect.objectContaining({ kind: "member", name: "Eddie Editor" })),
+    );
   });
 
   it("lets a viewer read and refuses every write with a logged 403", async () => {
