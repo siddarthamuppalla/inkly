@@ -216,6 +216,14 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
       path: `${d}/form`,
       init: json({ values: {}, flatten: true }),
     },
+    { name: "compress B's Document", method: "POST", path: `${d}/compress`, init: json({}) },
+    {
+      name: "compress B's Document claiming B's tenant",
+      method: "POST",
+      path: `${d}/compress`,
+      init: { ...json({}), headers: { "content-type": "application/json", ...asB } },
+    },
+    { name: "list B's Jobs", method: "GET", path: `${d}/jobs` },
     {
       name: "rotate B's pages",
       method: "POST",

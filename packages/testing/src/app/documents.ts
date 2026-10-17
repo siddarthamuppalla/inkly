@@ -41,21 +41,52 @@ export async function openDocuments(ctx: JourneyContext) {
   );
 }
 
+/**
+ * Waits for the viewer to show exactly `pages` rendered pages. After a write the Document
+ * refetches separately from its Version list, so the old Version can still be on screen.
+ */
 export async function pagesRendered(ctx: JourneyContext, pages: number) {
   const { page } = ctx;
-  await reach(
-    ctx,
-    page
-      .locator('[data-testid="page"][data-rendered="true"]')
-      .nth(pages - 1)
-      .waitFor(WAIT),
-    `the viewer did not render ${String(pages)} pages`,
-  );
-  const rendered = await page.locator('[data-testid="page"][data-rendered="true"]').count();
-  ctx.expect(
-    rendered === pages,
-    `viewer rendered ${String(rendered)} pages, expected ${String(pages)}`,
-  );
+  const ok = await page
+    .waitForFunction(
+      // A string, since this package's types have no DOM: every page rendered, and no extras.
+      `document.querySelectorAll('[data-testid="page"]').length === ${String(pages)} &&
+        document.querySelectorAll('[data-testid="page"]:not([data-rendered="true"])').length === 0`,
+      undefined,
+      WAIT,
+    )
+    .then(
+      () => true,
+      () => false,
+    );
+  if (!ok) {
+    const rendered = await page.locator('[data-testid="page"][data-rendered="true"]').count();
+    ctx.expect(false, `viewer rendered ${String(rendered)} pages, expected ${String(pages)}`);
+  }
+}
+
+/** Waits for Version `n` to be the newest, marked Current, with `pages` pages, and on screen. */
+export async function currentVersionIs(ctx: JourneyContext, n: number, pages: number) {
+  const { page } = ctx;
+  const label = pages === 1 ? "1 page" : `${String(pages)} pages`;
+  const newest = page.getByTestId("version").first();
+  const ok = await newest
+    .filter({ hasText: `Version ${String(n)}` })
+    .filter({ hasText: "Current" })
+    .filter({ hasText: label })
+    .waitFor(WAIT)
+    .then(
+      () => true,
+      () => false,
+    );
+  if (!ok) {
+    const top = (await newest.textContent().catch(() => "")) ?? "";
+    ctx.expect(
+      false,
+      `the newest version reads "${top}", expected Version ${String(n)}, Current, ${label}`,
+    );
+  }
+  await pagesRendered(ctx, pages);
 }
 
 const J003: Journey = {
@@ -181,17 +212,11 @@ const J005: Journey = {
     const versions = page.getByTestId("version");
     await page.getByTestId("upload-input").setInputFiles(fixture("tiny.pdf"));
     await reach(ctx, versions.nth(1).waitFor(WAIT), "uploading a new version did not add v2");
-    await pagesRendered(ctx, 1);
+    await currentVersionIs(ctx, 2, 1);
 
     await page.getByRole("button", { name: "Restore version 1" }).click();
     await reach(ctx, versions.nth(2).waitFor(WAIT), "restoring v1 did not add v3");
-    const first = versions.first();
-    const top = (await first.textContent().catch(() => "")) ?? "";
-    expect(
-      top.includes("Version 3") && top.includes("Current") && top.includes("10 pages"),
-      `the newest version reads "${top}", expected Version 3, Current, 10 pages`,
-    );
-    await pagesRendered(ctx, 10);
+    await currentVersionIs(ctx, 3, 10);
     await ctx.checkpoint("restored");
 
     const id = new URL(page.url()).pathname.split("/").pop() ?? "";
@@ -203,7 +228,100 @@ const J005: Journey = {
       sha256(await content.body()) === sha256(readFileSync(fixture("10p.pdf"))),
       "v3's bytes differ from v1 (10p.pdf)",
     );
+    // Backend: an older Version's bytes stay readable after a restore (fetched by the page,
+    // so the request counts toward route coverage).
+    const v2 = await page.evaluate<string, string>(
+      (path) =>
+        fetch(path)
+          .then((r) => r.arrayBuffer())
+          .then((b) => crypto.subtle.digest("SHA-256", b))
+          .then((d) => [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, "0")).join("")),
+      `/api/documents/${id}/versions/2/content`,
+    );
+    expect(v2 === sha256(readFileSync(fixture("tiny.pdf"))), "v2's bytes differ from tiny.pdf");
   },
 };
 
-export const DOCUMENT_JOURNEYS: readonly Journey[] = [J003, J004, J005];
+const J013: Journey = {
+  id: "J-013",
+  title: "Trash: move a Document to Trash and restore it",
+  async run(ctx) {
+    const { page, expect } = ctx;
+    await signedIn(ctx);
+    await openDocuments(ctx);
+    await uploadFromList(ctx, "tiny.pdf");
+    await page.getByTestId("document-row").getByRole("link", { name: "tiny" }).click();
+    await page.getByRole("button", { name: "Move to Trash" }).click();
+    await reach(
+      ctx,
+      page.getByRole("button", { name: "Upload PDF" }).waitFor(WAIT),
+      "Move to Trash did not return to Documents",
+    );
+    await reach(
+      ctx,
+      page
+        .getByTestId("document-row")
+        .filter({ hasText: "tiny" })
+        .waitFor({ ...WAIT, state: "detached" }),
+      "the trashed Document is still listed in Documents",
+    );
+
+    await page.getByRole("link", { name: "Trash" }).first().click();
+    const row = page.getByTestId("trash-row").filter({ hasText: "tiny" });
+    await reach(ctx, row.waitFor(WAIT), "Trash does not list the trashed Document");
+    await ctx.checkpoint("trash");
+    await row.getByRole("button", { name: "Restore tiny" }).click();
+    await reach(
+      ctx,
+      page.getByRole("heading", { name: "Trash is empty" }).waitFor(WAIT),
+      "Trash still lists the Document after Restore",
+    );
+
+    await openDocuments(ctx);
+    await reach(
+      ctx,
+      page.getByTestId("document-row").filter({ hasText: "tiny" }).waitFor(WAIT),
+      "the restored Document is not back in Documents",
+    );
+    expect(
+      (await page.getByTestId("document-row").count()) === 1,
+      "Documents does not list exactly the restored Document",
+    );
+    await ctx.checkpoint("restored");
+  },
+};
+
+const J014: Journey = {
+  id: "J-014",
+  title: "Folders: rename and delete",
+  async run(ctx) {
+    const { page } = ctx;
+    await signedIn(ctx);
+    await openDocuments(ctx);
+    await page.getByRole("button", { name: "New folder" }).click();
+    await page.getByLabel("Folder name").fill("Drafts");
+    await page.getByRole("button", { name: "Create folder" }).click();
+    await reach(
+      ctx,
+      page.getByRole("link", { name: "Drafts (folder)" }).waitFor(WAIT),
+      "the new folder Drafts is not listed",
+    );
+
+    await page.getByRole("button", { name: "Rename folder Drafts" }).click();
+    await page.getByLabel("New name for Drafts").fill("Archive");
+    await ctx.checkpoint("renaming");
+    await page.getByRole("button", { name: "Save" }).click();
+    const archive = page.getByRole("link", { name: "Archive (folder)" });
+    await reach(ctx, archive.waitFor(WAIT), "the folder does not read Archive after Rename");
+
+    await page.getByRole("button", { name: "Delete folder Archive" }).click();
+    await reach(
+      ctx,
+      archive.waitFor({ ...WAIT, state: "detached" }),
+      "the folder Archive is still listed after Delete",
+    );
+    await ctx.checkpoint("deleted");
+  },
+};
+
+export const DOCUMENT_JOURNEYS: readonly Journey[] = [J003, J004, J005, J013, J014];

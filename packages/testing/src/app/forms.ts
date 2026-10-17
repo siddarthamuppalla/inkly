@@ -3,7 +3,14 @@ import { join } from "node:path";
 
 import { runTool } from "../pdf/tools.ts";
 import { verifyFile } from "../pdf/verify.ts";
-import { openDocuments, pagesRendered, reach, uploadFromList, WAIT } from "./documents.ts";
+import {
+  currentVersionIs,
+  openDocuments,
+  pagesRendered,
+  reach,
+  uploadFromList,
+  WAIT,
+} from "./documents.ts";
 import type { Journey, JourneyContext } from "./journeys.ts";
 import { signedIn } from "./sign-in.ts";
 
@@ -53,19 +60,11 @@ export const J009: Journey = {
       page.getByRole("status").getByText("Saved as version 2.").waitFor(WAIT),
       "Save did not report version 2",
     );
-    const versions = page.getByTestId("version");
-    await reach(ctx, versions.nth(1).waitFor(WAIT), "Save did not add version 2 to the history");
-    const top =
-      (await versions
-        .first()
-        .textContent()
-        .catch(() => "")) ?? "";
-    expect(top.includes("Version 2") && top.includes("Current"), `newest version reads "${top}"`);
+    await currentVersionIs(ctx, 2, 1);
     expect(
       (await page.getByLabel("Full name", { exact: true }).inputValue()) === "Ada Lovelace",
       "the panel does not show the saved name for version 2",
     );
-    await pagesRendered(ctx, 1);
     await ctx.checkpoint("saved");
 
     const id = new URL(page.url()).pathname.split("/").pop() ?? "";
@@ -79,13 +78,12 @@ export const J009: Journey = {
 
     await page.getByLabel("Flatten", { exact: true }).check();
     await page.getByRole("button", { name: "Save", exact: true }).click();
-    await reach(ctx, versions.nth(2).waitFor(WAIT), "Save with Flatten did not add version 3");
+    await currentVersionIs(ctx, 3, 1);
     await reach(
       ctx,
       panel.waitFor({ ...WAIT, state: "detached" }),
       "the Fill form panel is still shown after flattening",
     );
-    await pagesRendered(ctx, 1);
     await ctx.checkpoint("flattened");
 
     const v3 = await savedVersion(ctx, who.token, id, 3);
