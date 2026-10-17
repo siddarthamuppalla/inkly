@@ -1,22 +1,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { Journey, JourneyContext } from "./journeys.ts";
+import { currentVersionIs, reach, WAIT } from "./documents.ts";
+import type { Journey } from "./journeys.ts";
 import { signedIn } from "./sign-in.ts";
 
 const FIXTURE = join(import.meta.dirname, "../../../../fixtures/pdfs/huge-image.pdf");
-const WAIT = { timeout: 20_000 };
 // A preview's first Job cold-starts the Container.
 const JOB_WAIT = { timeout: 180_000 };
-
-async function reach(ctx: JourneyContext, wait: Promise<unknown>, message: string) {
-  const ok = await wait.then(
-    () => true,
-    () => false,
-  );
-  ctx.expect(ok, message);
-  return ok;
-}
 
 const J007: Journey = {
   id: "J-007",
@@ -58,20 +49,7 @@ const J007: Journey = {
 
     const versions = page.getByTestId("version");
     await reach(ctx, versions.nth(1).waitFor(WAIT), "version history does not list v2");
-    const top =
-      (await versions
-        .first()
-        .textContent()
-        .catch(() => "")) ?? "";
-    expect(
-      top.includes("Version 2") && top.includes("Current") && top.includes("1 page"),
-      `the newest version reads "${top}", expected Version 2, Current, 1 page`,
-    );
-    await reach(
-      ctx,
-      page.locator('[data-testid="page"][data-rendered="true"]').first().waitFor(WAIT),
-      "the viewer did not render the compressed version",
-    );
+    await currentVersionIs(ctx, 2, 1);
     await ctx.checkpoint("compressed");
 
     const id = new URL(page.url()).pathname.split("/").pop() ?? "";
