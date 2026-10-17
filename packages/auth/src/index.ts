@@ -12,7 +12,8 @@ export {
 } from "./email.ts";
 export { testHooksOn, type AuthEnv } from "./env.ts";
 export { handleAuthRequest, CODE_REQUEST_LIMIT, CODE_REQUEST_WINDOW_MS } from "./handler.ts";
-export { mintDocumentId } from "./ids.ts";
+export { mintDocumentId, mintJobId } from "./ids.ts";
+export { tenantOfQueuedJob } from "./queue.ts";
 export { readAccessLog, seedAccount, type SeededAccount } from "./seed.ts";
 export {
   authenticate,

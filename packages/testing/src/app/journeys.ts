@@ -1,7 +1,8 @@
 import type { Locator, Page } from "playwright";
 
 import { ANNOTATION_JOURNEYS } from "./annotations.ts";
-import { DOCUMENT_JOURNEYS, openDocuments, uploadFromList } from "./documents.ts";
+import { COMPRESS_JOURNEYS } from "./compress.ts";
+import { DOCUMENT_JOURNEYS, openDocuments, reach, uploadFromList, WAIT } from "./documents.ts";
 import { PAGE_OP_JOURNEYS } from "./page-ops.ts";
 import { signedIn } from "./sign-in.ts";
 
@@ -217,6 +218,14 @@ const J002: Journey = {
       `Active tenant is ${String(me.activeTenant?.name)}, expected ${name}'s workspace`,
     );
     expect(me.role === "owner", `role is ${String(me.role)}, expected owner`);
+    // Backend: Better-Auth's own session endpoint reads the cookie the code sign-in set.
+    const session = await page.evaluate<{ user?: { email?: string } } | null>(
+      "fetch('/api/auth/get-session').then((r) => r.json()).catch(() => null)",
+    );
+    expect(
+      session?.user?.email === email,
+      `GET /api/auth/get-session user is ${String(session?.user?.email)}`,
+    );
     const workspace = page.getByTestId("user-menu").getByLabel("Workspace");
     expect(
       (await workspace.locator("option:checked").textContent()) === `${name}'s workspace`,
@@ -300,6 +309,83 @@ const J008: Journey = {
   },
 };
 
+const J015: Journey = {
+  id: "J-015",
+  title: "Switch workspace and remove a member",
+  async run(ctx) {
+    const { page, baseUrl, expect, checkpoint } = ctx;
+    const owner = await signedIn(ctx, { plan: "pro" });
+    await page.goto(new URL("/members", baseUrl).toString());
+    const invitee = uniqueEmail("j015");
+    await page.getByLabel("Email").fill(invitee);
+    await page.getByRole("button", { name: "Send invitation" }).click();
+    expect(
+      await visible(page.getByRole("status").getByText(`Invitation sent to ${invitee}.`)),
+      "no confirmation after sending the invitation",
+    );
+    const link = /https?:\/\/\S+\/invitations\/\S+/.exec(await latestMail(ctx, invitee))?.[0];
+    expect(link !== undefined, `no invitation link in the Outbox for ${invitee}`);
+
+    const member = await signedIn(ctx, { email: invitee });
+    await page.goto(new URL(new URL(link ?? "/", baseUrl).pathname, baseUrl).toString());
+    await page.getByRole("button", { name: "Accept invitation" }).click();
+    await page.waitForURL(`${baseUrl}/`, { timeout: 10_000 }).catch(() => undefined);
+    const joined = await apiMe(ctx);
+    expect(
+      joined.body.activeTenant?.id === owner.tenantId,
+      `after accepting, Active tenant is ${String(joined.body.activeTenant?.id)}, expected ${owner.tenantId}`,
+    );
+
+    const workspace = page.getByRole("combobox", { name: "Workspace" });
+    // Switching reloads the page once the API answers; read /api/me only after that reload.
+    const reloaded = page.waitForEvent("framenavigated", {
+      predicate: (f) => f === page.mainFrame(),
+      ...WAIT,
+    });
+    await workspace.selectOption(member.tenantId);
+    await reach(ctx, reloaded, "the page did not reload after switching workspace");
+    await page.waitForLoadState("load");
+    const switched = await apiMe(ctx);
+    expect(
+      switched.body.activeTenant?.id === member.tenantId && switched.body.role === "owner",
+      `after switching, Active tenant is ${String(switched.body.activeTenant?.id)} as ${String(switched.body.role)}, expected ${member.tenantId} as owner`,
+    );
+    expect(
+      (await workspace.inputValue().catch(() => "")) === member.tenantId,
+      "the Workspace menu does not show the workspace switched to",
+    );
+    await checkpoint("switched");
+
+    await page.setExtraHTTPHeaders({ authorization: `Bearer ${owner.token}` });
+    await page.goto(new URL("/members", baseUrl).toString());
+    const members = page.getByTestId("member-list");
+    expect(await visible(members.getByText(invitee)), "the invitee is not listed as a member");
+    await members.getByRole("button", { name: `Remove ${invitee}` }).click();
+    // A real deploy can take longer than `visible`'s 10 s to remove a member.
+    const removed = page.getByRole("status").getByText(`${invitee} was removed.`);
+    expect(
+      await removed.waitFor(WAIT).then(
+        () => true,
+        () => false,
+      ),
+      "no confirmation after removing the member",
+    );
+    // One row per member; the email also sits in its Remove button's label.
+    expect(
+      await members
+        .getByRole("listitem")
+        .filter({ hasText: invitee })
+        .waitFor({ ...WAIT, state: "detached" })
+        .then(
+          () => true,
+          () => false,
+        ),
+      "the removed member is still listed",
+    );
+    await checkpoint("removed");
+  },
+};
+
 export const JOURNEYS: ReadonlyMap<string, Journey> = new Map(
   [
     J000,
@@ -307,7 +393,9 @@ export const JOURNEYS: ReadonlyMap<string, Journey> = new Map(
     J002,
     ...DOCUMENT_JOURNEYS,
     ...PAGE_OP_JOURNEYS,
+    ...COMPRESS_JOURNEYS,
     J008,
+    J015,
     ...ANNOTATION_JOURNEYS,
     JFAIL,
   ].map((j) => [j.id, j]),

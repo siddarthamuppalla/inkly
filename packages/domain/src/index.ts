@@ -1,4 +1,4 @@
-export type { DocumentId, FolderId, TenantId, UserId } from "./ids.ts";
+export type { DocumentId, FolderId, JobId, TenantId, UserId } from "./ids.ts";
 export { isWellFormedId } from "./ids.ts";
 export { AppError, isAppError, type AppErrorCode } from "./errors.ts";
 export {
@@ -41,6 +41,17 @@ export {
   Rect,
   type AnnotationKind,
 } from "./annotations.ts";
+export {
+  COMPRESS_LEVELS,
+  CompressLevel,
+  CompressOutput,
+  CompressRequest,
+  JOB_STATUSES,
+  JobInfo,
+  JobListResponse,
+  JobResponse,
+  type JobStatus,
+} from "./jobs.ts";
 export {
   DeletePagesRequest,
   MergeRequest,

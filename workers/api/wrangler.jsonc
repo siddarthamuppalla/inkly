@@ -32,9 +32,39 @@
   ],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "inkly-files" }],
   "kv_namespaces": [{ "binding": "KV", "id": "00000000000000000000000000000000" }],
-  // T2.2: one DocSession per Document, SQLite-backed. Only this Worker binds it.
-  "durable_objects": {
-    "bindings": [{ "name": "DOC_SESSIONS", "class_name": "DocSession" }],
+  // T1.4b: Jobs. The API enqueues; this same Worker consumes (workers/jobs).
+  "queues": {
+    "producers": [{ "binding": "JOBS", "queue": "inkly-jobs" }],
+    "consumers": [
+      {
+        "queue": "inkly-jobs",
+        "max_batch_size": 1,
+        // MAX_DELIVERIES in workers/jobs/src/consumer.ts is max_retries + 1.
+        "max_retries": 2,
+      },
+    ],
   },
-  "migrations": [{ "tag": "v1-doc-session", "new_sqlite_classes": ["DocSession"] }],
+  // pdf-engine (containers/pdf-engine). Needs Workers Paid. `wrangler deploy` builds the image.
+  "containers": [
+    {
+      "class_name": "PdfEngine",
+      "image": "../../containers/pdf-engine/Dockerfile",
+      "instance_type": "basic",
+      // At least INSTANCES in workers/jobs/src/engine.ts.
+      "max_instances": 2,
+    },
+  ],
+  // T2.2: DocSession, one per Document, SQLite-backed. Only this Worker binds it.
+  "durable_objects": {
+    "bindings": [
+      { "name": "PDF_ENGINE", "class_name": "PdfEngine" },
+      { "name": "DOC_SESSIONS", "class_name": "DocSession" },
+    ],
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["PdfEngine"] },
+    { "tag": "v2-doc-session", "new_sqlite_classes": ["DocSession"] },
+  ],
+  // Local dev and verify-app call a local pdf-engine process instead (workers/jobs/src/env.ts).
+  "dev": { "enable_containers": false },
 }
