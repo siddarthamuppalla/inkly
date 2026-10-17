@@ -95,12 +95,12 @@ shareLinkRoutes.post("/:id/revoke", async (c) => {
 });
 
 shareLinkRoutes.get("/:id/activity", async (c) => {
-  const refused = refuseViewers(c);
-  if (refused) return refused;
   const tenantId = c.get("tenantId");
   const id = c.req.param("id");
   const link = isWellFormedId(id) ? await getShareLink(tenantId, c.env, id as ShareLinkId) : null;
   if (!link) return missing(c, "list");
+  const refused = refuseViewers(c);
+  if (refused) return refused;
   const page = pageOf(c);
   const rows = await listActivity(
     tenantId,
@@ -135,7 +135,7 @@ async function logVisit(
   c: ShareContext,
   link: OpenShareLink | GoneShareLink,
   action: AccessAction,
-  status: 200 | 401 | 404 | 429,
+  status: 200 | 401 | 404 | 422 | 429,
 ): Promise<void> {
   const fields = {
     actorTenantId: link.tenantId,
@@ -211,12 +211,20 @@ sharedRoutes.get("/:token/content", async (c) => {
 sharedRoutes.post("/:token/unlock", async (c) => {
   const link = await openLink(c, "unlock");
   if (link instanceof Response) return link;
-  if (link.passwordHash === null) return c.body(null, 204);
+  if (link.passwordHash === null) {
+    await logVisit(c, link, "unlock", 200);
+    return c.body(null, 204);
+  }
   if (!(await unlockAttemptAllowed(c.env, link.linkId))) {
     await logVisit(c, link, "unlock", 429);
     throw new AppError("rate_limited", "Too many attempts. Try again in 10 minutes.");
   }
-  const { password } = await parseJson(c.req.raw, ShareUnlock);
+  const { password } = await parseJson(c.req.raw, ShareUnlock).catch(async (error: unknown) => {
+    if (error instanceof AppError && error.code === "invalid_input") {
+      await logVisit(c, link, "unlock", 422);
+    }
+    throw error;
+  });
   if (!(await verifySharePassword(password, link.passwordHash))) {
     await logVisit(c, link, "unlock", 401);
     return c.json({ error: "unauthenticated", message: "That password is not right" }, 401);

@@ -21,8 +21,8 @@ export interface AccessDenied extends LinkVisit {
   readonly resource: string;
   /** The Document the entry concerns, when there is one (T2.4 activity). */
   readonly documentId?: string;
-  /** 401 and 429 only for Share-link visitors (wrong password, too many attempts). */
-  readonly status: 401 | 403 | 404 | 429;
+  /** 401, 422 and 429 only for Share-link visitors (wrong/invalid password, too many attempts). */
+  readonly status: 401 | 403 | 404 | 422 | 429;
   readonly at: number;
 }
 

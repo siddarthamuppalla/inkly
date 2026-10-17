@@ -224,6 +224,20 @@ describe("opening a share link signed out", () => {
     const listed = await (await as(a, "/api/share-links")).json<{ links: ShareLinkInfo[] }>();
     expect(listed.links[0]).toMatchObject({ opens: 1, lastOpenedAt: expect.any(Number) as number });
   });
+
+  it("logs an unlock request even when the link has no password", async () => {
+    const a = await seed();
+    const doc = await uploaded(a, "tiny.pdf");
+    const { token, link } = await shared(a, doc.id);
+    expect((await unlock(token, "unused password")).status).toBe(204);
+    expect(
+      (await accessLog(a.tenantId)).filter(
+        (e) => e.shareLinkId === link.id && e.action === "unlock",
+      ),
+    ).toMatchObject([
+      { status: 200, ip: VISITOR["cf-connecting-ip"], userAgent: VISITOR["user-agent"] },
+    ]);
+  });
 });
 
 describe("a password link", () => {
@@ -300,6 +314,28 @@ describe("a password link", () => {
       (e) => e.shareLinkId === link.id && e.action === "unlock",
     );
     expect(unlocks.map((e) => e.status)).toEqual([401, 200]);
+  });
+
+  it("logs malformed unlock attempts without disclosing their payload", async () => {
+    const { a, token, link } = await locked();
+    const invalid = [
+      json("POST", {}),
+      json("POST", { password: "" }),
+      { method: "POST", body: "{" },
+    ];
+    for (const body of invalid) {
+      expect((await visit(`/api/share/${token}/unlock`, body)).status).toBe(422);
+    }
+    const unlocks = (await accessLog(a.tenantId)).filter(
+      (e) => e.shareLinkId === link.id && e.action === "unlock",
+    );
+    expect(unlocks.map((e) => e.status)).toEqual([422, 422, 422]);
+    for (const entry of unlocks) {
+      expect(entry).toMatchObject({
+        ip: VISITOR["cf-connecting-ip"],
+        userAgent: VISITOR["user-agent"],
+      });
+    }
   });
 });
 

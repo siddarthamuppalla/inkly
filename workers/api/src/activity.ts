@@ -68,12 +68,12 @@ export function refuseViewers(c: TenantContext): Promise<Response> | null {
 export const activityRoutes = new Hono<{ Bindings: Env; Variables: TenantVars }>();
 
 activityRoutes.get("/:id/activity", async (c) => {
-  const refused = refuseViewers(c);
-  if (refused) return refused;
   const tenantId = c.get("tenantId");
   const id = c.req.param("id");
   const doc = isWellFormedId(id) ? await getDocument(tenantId, c.env, id as DocumentId) : null;
   if (!doc) return denyAccess(c, "list", `${c.req.method} ${c.req.path}`, 404);
+  const refused = refuseViewers(c);
+  if (refused) return refused;
   const page = pageOf(c);
   const rows = await listActivity(
     tenantId,

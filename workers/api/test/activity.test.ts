@@ -154,6 +154,9 @@ describe("a Document's activity", () => {
     }
     expect((await as(b, `/api/documents/${doc.id}/activity`)).status).toBe(404);
     expect((await as(b, `/api/share-links/${link.id}/activity`)).status).toBe(404);
+    const foreignViewer = appAs(b, "viewer");
+    expect((await foreignViewer(`/api/documents/${doc.id}/activity`)).status).toBe(404);
+    expect((await foreignViewer(`/api/share-links/${link.id}/activity`)).status).toBe(404);
   });
 });
 
