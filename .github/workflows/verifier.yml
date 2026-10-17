@@ -48,7 +48,10 @@ jobs:
             You are the Verifier bot for PR #${{ github.event.pull_request.number }} in ${{ github.repository }}
             (docs/factory/05_BOTS.md). You are read-only: the only file you may write is /tmp/verdict.md;
             never edit repo files, commit, push, approve or merge.
-            The builder's report is a claim, not evidence; re-run everything yourself on this checkout.
+            The builder's report is a claim, not evidence; re-run everything yourself on the PR head.
+            This action resets .claude/ in the checkout to the base branch, so first run
+            `git worktree add /tmp/verify ${{ github.event.pull_request.head.sha }} && cd /tmp/verify && pnpm i --frozen-lockfile`
+            and run every command below from /tmp/verify.
 
             1. Read CLAUDE.md, docs/factory/04_VERIFICATION.md, docs/factory/08_DEFINITION_OF_DONE.md,
                the PR body, and the linked ticket in docs/tickets/.
