@@ -34,7 +34,7 @@ journey, and `summary.md`. Paste the summary path into the PR's Verification Evi
 | `--url URL` | Target this URL instead of starting `wrangler dev`. |
 | `--secret S` | Test-hooks secret for the target, used to seed. Defaults to `$TEST_HOOKS_SECRET`. Without it, seeding is skipped and noted in the summary. |
 | `--out DIR` | Artifact root. Default `artifacts/verify-app/`. |
-| `--all` | Run every journey in `feature-map.md`, then check route coverage: read the API's routes from `GET /__test/routes` and fail for each one no journey reached with a 2xx or 3xx from the browser. Requests a journey makes with `page.request` do not count; use `page.evaluate(fetch…)` for a backend-only check. Exits 2 if a journey in `journeys.ts` has no feature-map row. Needs the test-hooks secret. |
+| `--all` | Run every journey in `feature-map.md`, then check route coverage: read the API's routes from `GET /__test/routes` and fail for each one no journey reached with a 2xx or 3xx from the browser (a WebSocket that received a frame counts as its route's 101 upgrade). Requests a journey makes with `page.request` do not count; use `page.evaluate(fetch…)` for a backend-only check. Exits 2 if a journey in `journeys.ts` has no feature-map row. Needs the test-hooks secret. |
 | `--self-test` | Runs the fixture journey `J-FAIL` against a built-in page four times: clean (must pass), console error, 5xx and an accessibility violation (each must fail for that reason). Exits 0 only if all four behave. |
 | `-h`, `--help` | Print usage. |
 

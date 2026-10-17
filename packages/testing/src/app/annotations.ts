@@ -236,6 +236,14 @@ const J010: Journey = {
         ((await comment.textContent()) ?? "").includes("Eddie Editor"),
         "the comment does not name its author",
       );
+      await a.getByLabel("Add a comment").fill("Thanks, agreed");
+      await a.getByRole("button", { name: "Comment", exact: true }).click();
+      await within(
+        ctx,
+        thread(b, "Highlight on page 1").getByText("Thanks, agreed"),
+        "visible",
+        "B sees A's reply",
+      );
       await ctx.checkpoint("thread");
 
       await a.getByRole("button", { name: "Resolve thread" }).click();
