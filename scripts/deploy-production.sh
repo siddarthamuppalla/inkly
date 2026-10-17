@@ -26,7 +26,7 @@ pnpm --dir "$root" --filter @inkly/web build >/dev/null
 (cd "$api_dir" && "$wrangler" d1 migrations apply DB --remote -c "$config")
 (cd "$api_dir" && "$wrangler" deploy -c "$config")
 
-ensure_random_secret "$config" BETTER_AUTH_SECRET
+ensure_random_secret "$name" "$config" BETTER_AUTH_SECRET
 if [ -n "${RESEND_API_KEY:-}" ]; then
   EMAIL_PROVIDER="${EMAIL_PROVIDER:-resend}"
   EMAIL_FROM="${EMAIL_FROM:-Inkly <onboarding@resend.dev>}"
