@@ -3,7 +3,7 @@ import { listAccessLog, setTenantPlan, type AccessLogRow, type Plan } from "@ink
 import { listMembershipsOfUser } from "@inkly/storage/auth";
 
 import { getAuth } from "./better-auth.ts";
-import type { AuthEnv } from "./env.ts";
+import { testHooksOn, type AuthEnv } from "./env.ts";
 
 export interface SeededAccount {
   readonly tenantId: TenantId;
@@ -38,4 +38,15 @@ export async function seedAccount(
   const tenantId = membership.tenantId as TenantId;
   if (input.plan) await setTenantPlan(tenantId, env, input.plan);
   return { tenantId, userId: user.id as UserId, email: user.email, token: session.token };
+}
+
+/** Test-only fixture: expire an already-open connection's session. */
+export async function expireSeededSession(
+  request: Request,
+  env: AuthEnv,
+  token: string,
+): Promise<void> {
+  if (!testHooksOn(env)) throw new AppError("internal", "Test hooks are disabled");
+  const auth = await getAuth(env, request.url).$context;
+  await auth.internalAdapter.updateSession(token, { expiresAt: new Date(0) });
 }

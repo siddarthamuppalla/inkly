@@ -2,7 +2,10 @@
 // content and workspace every way we know. Every attempt must be refused (403/404) and leave an
 // access-log entry.
 
+import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { join } from "node:path";
 
 export interface Attempt {
@@ -60,6 +63,33 @@ function call(baseUrl: string, who: Seeded, method: string, path: string, extra:
   return fetch(new URL(path, baseUrl), { ...extra, method, headers });
 }
 
+/** The status a WebSocket upgrade of `path` gets as `who`: 101 when the server accepts it. */
+function upgradeStatus(baseUrl: string, who: Seeded, path: string): Promise<number> {
+  const url = new URL(path, baseUrl);
+  const send = url.protocol === "https:" ? httpsRequest : httpRequest;
+  return new Promise((resolve, reject) => {
+    const req = send(url, {
+      headers: {
+        authorization: `Bearer ${who.token}`,
+        connection: "Upgrade",
+        upgrade: "websocket",
+        "sec-websocket-version": "13",
+        "sec-websocket-key": randomBytes(16).toString("base64"),
+      },
+    });
+    req.on("upgrade", (res, socket) => {
+      socket.destroy();
+      resolve(res.statusCode ?? 0);
+    });
+    req.on("response", (res) => {
+      res.resume();
+      resolve(res.statusCode ?? 0);
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 async function created<T>(res: Response, what: string): Promise<T> {
   if (res.status !== 201) {
     throw new Error(`${what} returned ${String(res.status)}: ${await describe(res)}`);
@@ -99,6 +129,26 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
   await call(baseUrl, b, "DELETE", `/api/documents/${trashedB.id}`);
   const folderA = await folderOf(a, "A folder");
   const docA = await upload(a, folderA);
+  const highlight = {
+    kind: "highlight",
+    page: 1,
+    color: "yellow",
+    rects: [{ x: 0, y: 0, w: 0.5, h: 0.1 }],
+  };
+  const annotationOf = async (who: Seeded, doc: Doc) =>
+    (
+      await created<{ annotation: { id: string } }>(
+        await call(baseUrl, who, "POST", `/api/documents/${doc.id}/annotations`, json(highlight)),
+        "create annotation",
+      )
+    ).annotation.id;
+  const annB = await annotationOf(b, docB);
+  await annotationOf(a, docA);
+  const annotationsOf = async (who: Seeded, doc: Doc) =>
+    JSON.stringify(
+      await (await call(baseUrl, who, "GET", `/api/documents/${doc.id}/annotations`)).json(),
+    );
+  const annotationsB = await annotationsOf(b, docB);
 
   // Control: A can reach its own data, so a denial below is a real denial, not a broken route.
   for (const path of [
@@ -108,10 +158,15 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     `/api/documents/${docA.id}/versions/1/content`,
     `/api/documents/${docA.id}/form`,
     `/api/documents?folderId=${folderA}`,
+    `/api/documents/${docA.id}/annotations`,
   ]) {
     const res = await call(baseUrl, a, "GET", path);
     await res.arrayBuffer();
     if (res.status !== 200) problems.push(`control: A GET ${path} returned ${String(res.status)}`);
+  }
+  const ownUpgrade = await upgradeStatus(baseUrl, a, `/api/documents/${docA.id}/annotations/live`);
+  if (ownUpgrade !== 101) {
+    problems.push(`control: A's live annotations upgrade returned ${String(ownUpgrade)}`);
   }
   const ownList = (await (
     await call(baseUrl, a, "GET", `/api/documents?folderId=${folderA}`)
@@ -306,7 +361,53 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     },
   ];
 
+  const ann = `${d}/annotations`;
+  plan.push(
+    { name: "list B's Annotations", method: "GET", path: ann },
+    {
+      name: "list B's Annotations claiming B's tenant",
+      method: "GET",
+      path: ann,
+      init: { headers: asB },
+    },
+    { name: "annotate B's Document", method: "POST", path: ann, init: json(highlight) },
+    {
+      name: "recolor B's Annotation",
+      method: "PATCH",
+      path: `${ann}/${annB}`,
+      init: json({ color: "red" }),
+    },
+    { name: "delete B's Annotation", method: "DELETE", path: `${ann}/${annB}` },
+    {
+      name: "comment on B's Annotation",
+      method: "POST",
+      path: `${ann}/${annB}/comments`,
+      init: json({ text: "pwned" }),
+    },
+    { name: "resolve B's Annotation thread", method: "POST", path: `${ann}/${annB}/resolve` },
+    {
+      name: "download B's Document with annotations",
+      method: "GET",
+      path: `${d}/annotated-content`,
+    },
+  );
+
   const attempts: Attempt[] = [];
+  for (const live of [
+    { name: "open B's live annotations WebSocket", path: `${ann}/live` },
+    {
+      name: "open B's live annotations WebSocket claiming B's tenant",
+      path: `${ann}/live?tenant=${b.tenantId}`,
+    },
+  ]) {
+    const status = await upgradeStatus(baseUrl, a, live.path);
+    attempts.push({
+      ...live,
+      method: "GET (upgrade)",
+      status,
+      denied: status === 403 || status === 404,
+    });
+  }
   for (const p of plan) {
     const res = await call(baseUrl, a, p.method, p.path, p.init);
     await res.arrayBuffer();
@@ -319,6 +420,7 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     });
   }
 
+  if ((await annotationsOf(b, docB)) !== annotationsB) problems.push("B's Annotations changed");
   const docNow = async (id: string) => {
     const res = await call(baseUrl, b, "GET", `/api/documents/${id}`);
     return res.status === 200 ? ((await res.json()) as { document: Doc }).document : null;

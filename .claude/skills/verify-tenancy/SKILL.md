@@ -15,12 +15,14 @@ its own folder and Document. Then A tries to reach B's data every known way:
 - by fetching B's content and Version content (the R2 objects);
 - by listing, adding and restoring B's Versions;
 - by reading and filling B's form fields;
-- by uploading into, nesting under, renaming, moving into and deleting B's folder.
+- by uploading into, nesting under, renaming, moving into and deleting B's folder;
+- by listing, adding, recoloring, deleting, commenting on and resolving B's Annotations,
+  downloading B's Document with annotations, and opening B's live annotations WebSocket.
 
 Pass means every attempt returned 403 or 404. A's access log must hold exactly one
 denial entry per denied attempt, and B's Documents and folders must be unchanged.
-Control requests also confirm that A can reach its own Document, content, Versions and
-folder (and that its three content reads, the form read among them, were logged), so a broken route can't pass as a
+Control requests also confirm that A can reach its own Document, content, Versions,
+form fields, Annotations, live WebSocket and folder (and that its three content reads were logged), so a broken route can't pass as a
 denial.
 
 ## When to run it
@@ -47,6 +49,7 @@ It prints a table of attempts with their statuses. Exit codes: `0` pass, `1` a l
 or check failure. For `--self-test`, `0` means the leak was caught.
 
 ## What it attacks today
-`/api/documents` (`workers/api/src/documents.ts`) and `/api/folders`
+`/api/documents` (`workers/api/src/documents.ts`), its Annotation routes and
+DocSession WebSocket (`workers/api/src/annotations.ts`) and `/api/folders`
 (`workers/api/src/folders.ts`). Add cases to `attack.ts` when a new tenant-scoped
 route ships.

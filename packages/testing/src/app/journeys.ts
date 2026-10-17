@@ -1,5 +1,6 @@
 import type { Locator, Page } from "playwright";
 
+import { ANNOTATION_JOURNEYS } from "./annotations.ts";
 import { COMPRESS_JOURNEYS } from "./compress.ts";
 import { DOCUMENT_JOURNEYS, openDocuments, reach, uploadFromList, WAIT } from "./documents.ts";
 import { J009 } from "./forms.ts";
@@ -404,6 +405,7 @@ export const JOURNEYS: ReadonlyMap<string, Journey> = new Map(
     J008,
     J009,
     J015,
+    ...ANNOTATION_JOURNEYS,
     JFAIL,
   ].map((j) => [j.id, j]),
 );

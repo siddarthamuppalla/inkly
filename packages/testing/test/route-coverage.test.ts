@@ -58,4 +58,15 @@ describe("routeCoverage", () => {
     );
     expect(result.find((r) => r.route.path === "/api/documents/:id")?.hits).toBe(0);
   });
+
+  it("counts a WebSocket upgrade (101) as a successful GET, and no other 1xx", () => {
+    const live = [{ method: "GET", path: "/api/documents/:id/live" }];
+    const hits = (status: number) =>
+      routeCoverage(
+        live,
+        seen({ "J-010": [{ method: "GET", path: "/api/documents/doc_1/live", status }] }),
+      )[0]?.hits;
+    expect(hits(101)).toBe(1);
+    expect(hits(100)).toBe(0);
+  });
 });
