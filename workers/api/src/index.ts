@@ -9,6 +9,7 @@ import { onAppError } from "./errors.ts";
 import { folderRoutes } from "./folders.ts";
 import { jobRoutes } from "./jobs.ts";
 import { pageOpRoutes } from "./page-ops.ts";
+import { sharedRoutes, shareLinkRoutes } from "./share-links.ts";
 import { requireTenant } from "./tenant-context.ts";
 import { testHooks } from "./test-hooks.ts";
 
@@ -34,6 +35,9 @@ app.use("/api/folders/*", requireTenant);
 app.route("/api/folders", folderRoutes);
 app.use("/api/jobs/*", requireTenant);
 app.route("/api", jobRoutes);
+app.use("/api/share-links/*", requireTenant);
+app.route("/api/share-links", shareLinkRoutes);
+app.route("/api/share", sharedRoutes);
 
 // verify-app fails a full run when one of these routes got no successful request from any
 // journey. Registered after the `/__test` guard, so it is a 404 without the secret.

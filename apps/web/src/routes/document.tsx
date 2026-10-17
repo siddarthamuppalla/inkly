@@ -7,6 +7,7 @@ import { CompressPanel } from "../components/compress.tsx";
 import { Page } from "../components/page.tsx";
 import { PageEdits } from "../components/page-edits.tsx";
 import { PageCanvas, usePdf } from "../components/pdf-pages.tsx";
+import { SharePanel } from "../components/share-dialog.tsx";
 import { Badge } from "../components/ui/badge.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Field } from "../components/ui/field.tsx";
@@ -75,6 +76,7 @@ function Viewer({ doc }: { readonly doc: DocumentInfo }) {
           <Actions doc={doc} />
           <PageEdits key={doc.currentVersion} doc={doc} pdf={pdf} />
           <CompressPanel doc={doc} />
+          <SharePanel doc={doc} />
           <Versions doc={doc} />
         </aside>
         <nav aria-label="Page thumbnails" className="hidden md:block xl:col-start-1 xl:row-start-1">

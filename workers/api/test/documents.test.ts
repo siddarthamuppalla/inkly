@@ -160,6 +160,9 @@ describe("list, get and download", () => {
         status: 200,
         actorUserId: a.userId,
         at: expect.any(Number) as number,
+        shareLinkId: null,
+        ip: null,
+        userAgent: null,
       },
       {
         action: "read-content",
@@ -167,6 +170,9 @@ describe("list, get and download", () => {
         status: 200,
         actorUserId: a.userId,
         at: expect.any(Number) as number,
+        shareLinkId: null,
+        ip: null,
+        userAgent: null,
       },
     ]);
   });

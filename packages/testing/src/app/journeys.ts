@@ -3,6 +3,7 @@ import type { Locator, Page } from "playwright";
 import { COMPRESS_JOURNEYS } from "./compress.ts";
 import { DOCUMENT_JOURNEYS, openDocuments, reach, uploadFromList, WAIT } from "./documents.ts";
 import { PAGE_OP_JOURNEYS } from "./page-ops.ts";
+import { SHARE_JOURNEYS } from "./share-links.ts";
 import { signedIn } from "./sign-in.ts";
 
 export interface JourneyContext {
@@ -24,10 +25,14 @@ export interface Journey {
   /** Fixture journeys exist only for `--self-test` and never appear in feature-map.md. */
   readonly selfTestOnly?: boolean;
   /**
-   * 4xx responses this journey causes on purpose (status and exact path). Chromium logs
-   * them as console errors; listed ones are reported but do not fail the journey.
+   * 4xx responses this journey causes on purpose (status and exact path, or a pattern for
+   * paths with a generated part). Chromium logs them as console errors; listed ones are
+   * reported but do not fail the journey.
    */
-  readonly expectedClientErrors?: readonly { readonly status: number; readonly path: string }[];
+  readonly expectedClientErrors?: readonly {
+    readonly status: number;
+    readonly path: string | RegExp;
+  }[];
   readonly run: (ctx: JourneyContext) => Promise<void>;
 }
 
@@ -395,6 +400,7 @@ export const JOURNEYS: ReadonlyMap<string, Journey> = new Map(
     ...COMPRESS_JOURNEYS,
     J008,
     J015,
+    ...SHARE_JOURNEYS,
     JFAIL,
   ].map((j) => [j.id, j]),
 );

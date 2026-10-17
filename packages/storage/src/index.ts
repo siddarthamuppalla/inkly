@@ -47,3 +47,11 @@ export {
   type JobRow,
   type JobRowStatus,
 } from "./jobs.ts";
+export {
+  createShareLink,
+  getShareLink,
+  listShareLinks,
+  revokeShareLink,
+  type NewShareLink,
+  type ShareLinkRow,
+} from "./share-links.ts";
