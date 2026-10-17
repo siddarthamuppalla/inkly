@@ -1,0 +1,62 @@
+name: auto-merge
+# Merges a green agent PR once every guardrail in scripts/auto-merge.mjs holds
+# (docs/ops/auto-merge.md). It runs from main's copy of this file and the script, never
+# the PR's, so a PR cannot loosen the rules it is judged by.
+on:
+  workflow_run:
+    workflows: [ci, preview]
+    types: [completed]
+  pull_request_target:
+    types: [labeled, unlabeled, ready_for_review]
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: read
+  actions: write
+concurrency:
+  group: auto-merge-${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}
+  cancel-in-progress: false
+jobs:
+  auto-merge:
+    if: >-
+      vars.AUTO_MERGE != 'off' && (
+        (github.event_name == 'pull_request_target' &&
+          github.event.pull_request.head.repo.full_name == github.repository) ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' &&
+          github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      FACTORY_PAUSED: ${{ vars.FACTORY_PAUSED }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      # The default branch only: no PR code is checked out or run here.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc }
+      - name: find the PR
+        id: pr
+        run: |
+          if [ -n "$PR_NUMBER" ]; then
+            echo "number=$PR_NUMBER" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A CI run for an older commit says nothing about the current head.
+          number="$(gh pr list --head "$HEAD_BRANCH" --state open --json number,headRefOid \
+            -q ".[] | select(.headRefOid == \"$HEAD_SHA\") | .number")"
+          if [ -z "$number" ]; then
+            echo "⏭️ no open PR has $HEAD_BRANCH at $HEAD_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "number=$number" >>"$GITHUB_OUTPUT"
+          fi
+      - if: steps.pr.outputs.number != ''
+        run: node scripts/auto-merge.mjs "${{ steps.pr.outputs.number }}"

@@ -4,6 +4,7 @@ import { useState, type SyntheticEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { ActivityPanel } from "../components/activity-panel.tsx";
+import { CompressPanel } from "../components/compress.tsx";
 import { Page } from "../components/page.tsx";
 import { PageEdits } from "../components/page-edits.tsx";
 import { PageCanvas, usePdf } from "../components/pdf-pages.tsx";
@@ -75,6 +76,7 @@ function Viewer({ doc }: { readonly doc: DocumentInfo }) {
         >
           <Actions doc={doc} />
           <PageEdits key={doc.currentVersion} doc={doc} pdf={pdf} />
+          <CompressPanel doc={doc} />
           <SharePanel doc={doc} />
           <Versions doc={doc} />
           <ActivityPanel doc={doc} />

@@ -1,5 +1,12 @@
 import type { Journey } from "./journeys.ts";
-import { openDocuments, pagesRendered, reach, uploadFromList, WAIT } from "./documents.ts";
+import {
+  currentVersionIs,
+  openDocuments,
+  pagesRendered,
+  reach,
+  uploadFromList,
+  WAIT,
+} from "./documents.ts";
 import { signedIn } from "./sign-in.ts";
 
 /** The first page's canvas is wider than tall: the portrait page has turned a quarter. */
@@ -27,14 +34,14 @@ const J006: Journey = {
     await page.getByRole("checkbox", { name: "Select page 1", exact: true }).check();
     await page.getByRole("button", { name: "Rotate right" }).click();
     await reach(ctx, versions.nth(1).waitFor(WAIT), "Rotate right did not add Version 2");
-    await pagesRendered(ctx, 10);
+    await currentVersionIs(ctx, 2, 10);
     expect(await firstPageLandscape(ctx), "page 1 is not landscape after Rotate right");
     await ctx.checkpoint("rotated");
 
     await page.getByRole("button", { name: "Move page 10 up" }).click();
     await page.getByRole("button", { name: "Save order" }).click();
     await reach(ctx, versions.nth(2).waitFor(WAIT), "Save order did not add Version 3");
-    await pagesRendered(ctx, 10);
+    await currentVersionIs(ctx, 3, 10);
     // The panel remounts once the Document (not just its Version list) has refetched.
     await reach(
       ctx,
@@ -50,16 +57,7 @@ const J006: Journey = {
     await page.getByRole("checkbox", { name: "Select page 10", exact: true }).check();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await reach(ctx, versions.nth(3).waitFor(WAIT), "Delete did not add Version 4");
-    await pagesRendered(ctx, 9);
-    const top =
-      (await versions
-        .first()
-        .textContent()
-        .catch(() => "")) ?? "";
-    expect(
-      top.includes("Version 4") && top.includes("Current") && top.includes("9 pages"),
-      `the newest version reads "${top}", expected Version 4, Current, 9 pages`,
-    );
+    await currentVersionIs(ctx, 4, 9);
     await ctx.checkpoint("edited");
 
     await page.getByLabel("Split into new documents").fill("1-4, 5-9");

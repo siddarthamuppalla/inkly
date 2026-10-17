@@ -51,6 +51,12 @@ config.r2_buckets = config.r2_buckets.map((b) =>
 config.kv_namespaces = config.kv_namespaces.map((k) =>
   k.binding === "KV" ? { ...k, id: kvId } : k,
 );
+// Each environment has its own Job queue; ensure_resources in cf-lib.sh creates it.
+const jobs = `${name}-jobs`;
+config.queues = {
+  producers: config.queues.producers.map((p) => (p.binding === "JOBS" ? { ...p, queue: jobs } : p)),
+  consumers: config.queues.consumers.map((c) => ({ ...c, queue: jobs })),
+};
 // Previews never send real mail: it lands in the Outbox (Q5).
 if (!production) config.vars = { ...config.vars, TEST_HOOKS: "enabled", EMAIL_PROVIDER: "outbox" };
 

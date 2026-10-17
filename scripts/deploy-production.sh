@@ -2,7 +2,9 @@
 # Deploys main to production (T1.6). Runs from .github/workflows/deploy.yml after a human
 # approves the `production` environment; never run it from an agent session.
 #
-#   scripts/deploy-production.sh     create or reuse the `inkly` Worker, D1, R2 and KV,
+#   scripts/deploy-production.sh     create or reuse the `inkly` Worker, D1, R2, KV and the
+#                                    `inkly-jobs` queue; wrangler builds the pdf-engine image
+#                                    (needs Docker and Workers Paid),
 #                                    migrate, deploy, smoke-test, print the URL
 #
 # Needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. Optional secrets copied into the
@@ -24,7 +26,7 @@ pnpm --dir "$root" --filter @inkly/web build >/dev/null
 (cd "$api_dir" && "$wrangler" d1 migrations apply DB --remote -c "$config")
 (cd "$api_dir" && "$wrangler" deploy -c "$config")
 
-ensure_random_secret "$config" BETTER_AUTH_SECRET
+ensure_random_secret "$name" "$config" BETTER_AUTH_SECRET
 if [ -n "${RESEND_API_KEY:-}" ]; then
   EMAIL_PROVIDER="${EMAIL_PROVIDER:-resend}"
   EMAIL_FROM="${EMAIL_FROM:-Inkly <onboarding@resend.dev>}"

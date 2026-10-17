@@ -9,7 +9,9 @@ concurrency:
   group: preview-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 jobs:
-  deploy:
+  # `preview` is a check auto-merge requires (docs/ops/auto-merge.md): every journey and the
+  # tenancy attacks against this PR's own Worker, D1, R2 and KV on real Cloudflare.
+  preview:
     # Secrets are not available to fork PRs; previews are for branches in this repo.
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
@@ -28,7 +30,9 @@ jobs:
           if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
-            echo "⏭️ preview skipped: CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set (scripts/setup-cloudflare-secrets.sh)" | tee -a "$GITHUB_STEP_SUMMARY"
+            # Fails rather than skips: auto-merge must never read an unverified preview as green.
+            echo "❌ preview cannot run: CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set (scripts/setup-cloudflare-secrets.sh)" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
       - if: steps.secrets.outputs.ready == 'true'
         uses: actions/checkout@v4
@@ -51,7 +55,7 @@ jobs:
         if: steps.secrets.outputs.ready == 'true'
         run: |
           .claude/skills/cf-deploy-preview/run.sh --list "$PR" | tee "$RUNNER_TEMP/resources"
-          for kind in worker d1 r2 kv; do
+          for kind in worker d1 r2 kv queue container; do
             n="$(grep -c "^$kind " "$RUNNER_TEMP/resources" || true)"
             [ "$n" = "1" ] || { echo "expected one $kind, found $n"; exit 1; }
           done
@@ -63,8 +67,18 @@ jobs:
           TEST_HOOKS_SECRET="$(cat "$RUNNER_TEMP/preview-secret")"
           export TEST_HOOKS_SECRET
           pnpm --filter @inkly/testing exec playwright install --with-deps chromium
-          .claude/skills/verify-app/run.sh --url "$URL" J-000 J-006
+          .claude/skills/verify-app/run.sh --url "$URL" --all
           .claude/skills/verify-tenancy/run.sh --url "$URL"
+      # Reported, not gating: on real Cloudflare, split is over the 3 s bound on main today (#54).
+      # The ci.yml verify-perf job still gates the in-Worker ops.
+      - name: verify-perf on the preview (report only, #54)
+        if: steps.secrets.outputs.ready == 'true'
+        continue-on-error: true
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          TEST_HOOKS_SECRET="$(cat "$RUNNER_TEMP/preview-secret")"
+          export TEST_HOOKS_SECRET
           .claude/skills/verify-perf/run.sh --url "$URL"
       - name: upload verify-app artifacts
         if: always() && steps.secrets.outputs.ready == 'true'
@@ -81,7 +95,7 @@ jobs:
         with:
           script: |
             const marker = "<!-- inkly-preview -->";
-            const body = `${marker}\nPreview: ${process.env.URL}\n\nCommit ${context.payload.pull_request.head.sha.slice(0, 7)}: \`/health\` 200, verify-app J-000 and verify-tenancy passed against it.`;
+            const body = `${marker}\nPreview: ${process.env.URL}\n\nCommit ${context.payload.pull_request.head.sha.slice(0, 7)}: \`/health\` 200, verify-app (every journey) and verify-tenancy passed against it.`;
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
             const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });

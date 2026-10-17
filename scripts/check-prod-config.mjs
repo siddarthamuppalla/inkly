@@ -1,5 +1,6 @@
 // Q11: production Worker config must never enable test hooks. Fails if
-// workers/api/wrangler.jsonc mentions TEST_HOOKS anywhere (vars, env blocks, comments).
+// workers/api/wrangler.jsonc mentions TEST_HOOKS anywhere (vars, env blocks, comments),
+// or PDF_ENGINE_URL (the local-dev stand-in for the pdf-engine Container).
 // usage: node scripts/check-prod-config.mjs [path-to-wrangler.jsonc]
 import { readFileSync } from "node:fs";
 
@@ -7,7 +8,7 @@ const file = process.argv[2] ?? "workers/api/wrangler.jsonc";
 const hits = readFileSync(file, "utf8")
   .split("\n")
   .map((line, i) => ({ line, n: i + 1 }))
-  .filter(({ line }) => /TEST_HOOKS|VERIFY_TENANCY_SELFTEST/.test(line));
+  .filter(({ line }) => /TEST_HOOKS|VERIFY_TENANCY_SELFTEST|PDF_ENGINE_URL/.test(line));
 
 if (hits.length > 0) {
   for (const { line, n } of hits) console.error(`${file}:${String(n)}: ${line.trim()}`);
