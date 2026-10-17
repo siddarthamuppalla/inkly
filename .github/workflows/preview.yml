@@ -55,7 +55,7 @@ jobs:
         if: steps.secrets.outputs.ready == 'true'
         run: |
           .claude/skills/cf-deploy-preview/run.sh --list "$PR" | tee "$RUNNER_TEMP/resources"
-          for kind in worker d1 r2 kv; do
+          for kind in worker d1 r2 kv queue container; do
             n="$(grep -c "^$kind " "$RUNNER_TEMP/resources" || true)"
             [ "$n" = "1" ] || { echo "expected one $kind, found $n"; exit 1; }
           done
@@ -105,7 +105,7 @@ jobs:
         with:
           script: |
             const marker = "<!-- inkly-preview -->";
-            const body = `${marker}\nPreview: ${process.env.URL}\n\nCommit ${context.payload.pull_request.head.sha.slice(0, 7)}: \`/health\` 200, verify-app J-000 and verify-tenancy passed against it.`;
+            const body = `${marker}\nPreview: ${process.env.URL}\n\nCommit ${context.payload.pull_request.head.sha.slice(0, 7)}: \`/health\` 200, verify-app (every journey) and verify-tenancy passed against it.`;
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
             const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });

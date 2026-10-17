@@ -45,7 +45,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-        with: { chromium: "true" }
+        # pdf-tools: J-007 runs Jobs in a local pdf-engine process (gs, qpdf).
+        with: { chromium: "true", pdf-tools: "true" }
       - run: .claude/skills/verify-app/run.sh --self-test
       # Every journey in feature-map.md, and a failure for any API route no journey reached.
       - run: .claude/skills/verify-app/run.sh --all
