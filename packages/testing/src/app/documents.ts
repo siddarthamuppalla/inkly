@@ -41,21 +41,52 @@ export async function openDocuments(ctx: JourneyContext) {
   );
 }
 
+/**
+ * Waits for the viewer to show exactly `pages` rendered pages. After a write the Document
+ * refetches separately from its Version list, so the old Version can still be on screen.
+ */
 export async function pagesRendered(ctx: JourneyContext, pages: number) {
   const { page } = ctx;
-  await reach(
-    ctx,
-    page
-      .locator('[data-testid="page"][data-rendered="true"]')
-      .nth(pages - 1)
-      .waitFor(WAIT),
-    `the viewer did not render ${String(pages)} pages`,
-  );
-  const rendered = await page.locator('[data-testid="page"][data-rendered="true"]').count();
-  ctx.expect(
-    rendered === pages,
-    `viewer rendered ${String(rendered)} pages, expected ${String(pages)}`,
-  );
+  const ok = await page
+    .waitForFunction(
+      // A string, since this package's types have no DOM: every page rendered, and no extras.
+      `document.querySelectorAll('[data-testid="page"]').length === ${String(pages)} &&
+        document.querySelectorAll('[data-testid="page"]:not([data-rendered="true"])').length === 0`,
+      undefined,
+      WAIT,
+    )
+    .then(
+      () => true,
+      () => false,
+    );
+  if (!ok) {
+    const rendered = await page.locator('[data-testid="page"][data-rendered="true"]').count();
+    ctx.expect(false, `viewer rendered ${String(rendered)} pages, expected ${String(pages)}`);
+  }
+}
+
+/** Waits for Version `n` to be the newest, marked Current, with `pages` pages, and on screen. */
+export async function currentVersionIs(ctx: JourneyContext, n: number, pages: number) {
+  const { page } = ctx;
+  const label = pages === 1 ? "1 page" : `${String(pages)} pages`;
+  const newest = page.getByTestId("version").first();
+  const ok = await newest
+    .filter({ hasText: `Version ${String(n)}` })
+    .filter({ hasText: "Current" })
+    .filter({ hasText: label })
+    .waitFor(WAIT)
+    .then(
+      () => true,
+      () => false,
+    );
+  if (!ok) {
+    const top = (await newest.textContent().catch(() => "")) ?? "";
+    ctx.expect(
+      false,
+      `the newest version reads "${top}", expected Version ${String(n)}, Current, ${label}`,
+    );
+  }
+  await pagesRendered(ctx, pages);
 }
 
 const J003: Journey = {
@@ -181,17 +212,11 @@ const J005: Journey = {
     const versions = page.getByTestId("version");
     await page.getByTestId("upload-input").setInputFiles(fixture("tiny.pdf"));
     await reach(ctx, versions.nth(1).waitFor(WAIT), "uploading a new version did not add v2");
-    await pagesRendered(ctx, 1);
+    await currentVersionIs(ctx, 2, 1);
 
     await page.getByRole("button", { name: "Restore version 1" }).click();
     await reach(ctx, versions.nth(2).waitFor(WAIT), "restoring v1 did not add v3");
-    const first = versions.first();
-    const top = (await first.textContent().catch(() => "")) ?? "";
-    expect(
-      top.includes("Version 3") && top.includes("Current") && top.includes("10 pages"),
-      `the newest version reads "${top}", expected Version 3, Current, 10 pages`,
-    );
-    await pagesRendered(ctx, 10);
+    await currentVersionIs(ctx, 3, 10);
     await ctx.checkpoint("restored");
 
     const id = new URL(page.url()).pathname.split("/").pop() ?? "";

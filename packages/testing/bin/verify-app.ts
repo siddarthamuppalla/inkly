@@ -131,6 +131,13 @@ async function verify(
       console.log(
         `${r.ok ? "PASS" : "FAIL"} ${r.id} ${r.title}${r.ok ? "" : `: ${r.failures.join("; ")}`}`,
       );
+      // CI artifacts can be hard to reach, so a failure carries its last API calls in the log.
+      if (!r.ok) {
+        for (const e of [...r.consoleErrors, ...r.failedRequests]) console.log(`  ! ${e}`);
+        for (const q of r.requests.filter((q) => q.path.startsWith("/api/")).slice(-15)) {
+          console.log(`  ${q.method} ${q.path} ${String(q.status)}`);
+        }
+      }
     }
     for (const f of failures) console.log(`FAIL ${f}`);
     console.log(`artifacts: ${relative(process.cwd(), outDir) || "."}`);
