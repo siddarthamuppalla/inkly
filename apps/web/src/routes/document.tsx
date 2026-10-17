@@ -7,6 +7,7 @@ import { AnnotationLayer } from "../components/annotations/annotation-layer.tsx"
 import { CommentsPanel } from "../components/annotations/comments-panel.tsx";
 import { AnnotationsProvider } from "../components/annotations/context.tsx";
 import { CompressPanel } from "../components/compress.tsx";
+import { FormPanel } from "../components/form-panel.tsx";
 import { Page } from "../components/page.tsx";
 import { PageEdits } from "../components/page-edits.tsx";
 import { PageCanvas, usePdf } from "../components/pdf-pages.tsx";
@@ -80,6 +81,7 @@ function Viewer({ doc }: { readonly doc: DocumentInfo }) {
           className="flex flex-col gap-6 md:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1"
         >
           <Actions doc={doc} />
+          <FormPanel doc={doc} />
           <PageEdits key={doc.currentVersion} doc={doc} pdf={pdf} />
           <CompressPanel doc={doc} />
           <CommentsPanel />

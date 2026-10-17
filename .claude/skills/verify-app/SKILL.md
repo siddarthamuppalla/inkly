@@ -59,6 +59,7 @@ Exit codes: `0` pass, `1` a journey or check failed, `2` bad arguments or an unk
 Run `pnpm i` first. Chromium is installed with
 `pnpm --filter @inkly/testing exec playwright install --with-deps chromium`.
 Alternatively, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to an existing Chromium binary.
+J-009 also runs verify-pdf on the Versions it saves, so it needs qpdf and poppler-utils.
 
 ## Test hooks under `pnpm dev`
 Copy `workers/api/.dev.vars.example` to `workers/api/.dev.vars` (it is gitignored) to

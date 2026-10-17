@@ -14,6 +14,7 @@ its own folder and Document. Then A tries to reach B's data every known way:
 - by listing B's Documents, folder contents and folders;
 - by fetching B's content and Version content (the R2 objects);
 - by listing, adding and restoring B's Versions;
+- by reading and filling B's form fields;
 - by uploading into, nesting under, renaming, moving into and deleting B's folder;
 - by listing, adding, recoloring, deleting, commenting on and resolving B's Annotations,
   downloading B's Document with annotations, and opening B's live annotations WebSocket.
@@ -21,7 +22,7 @@ its own folder and Document. Then A tries to reach B's data every known way:
 Pass means every attempt returned 403 or 404. A's access log must hold exactly one
 denial entry per denied attempt, and B's Documents and folders must be unchanged.
 Control requests also confirm that A can reach its own Document, content, Versions,
-Annotations, live WebSocket and folder (and that its two content reads were logged), so a broken route can't pass as a
+form fields, Annotations, live WebSocket and folder (and that its three content reads were logged), so a broken route can't pass as a
 denial.
 
 ## When to run it

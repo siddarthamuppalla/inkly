@@ -26,6 +26,15 @@ export {
   VersionListResponse,
 } from "./documents.ts";
 export {
+  FieldRect,
+  FormField,
+  FormFieldsResponse,
+  FormFill,
+  FormValue,
+  type FormFieldType,
+  type FormValues,
+} from "./forms.ts";
+export {
   ANNOTATION_COLORS,
   Annotation,
   AnnotationColor,

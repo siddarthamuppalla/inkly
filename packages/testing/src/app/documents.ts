@@ -6,7 +6,7 @@ import type { Journey, JourneyContext } from "./journeys.ts";
 import { signedIn } from "./sign-in.ts";
 
 const FIXTURES = join(import.meta.dirname, "../../../../fixtures/pdfs");
-const fixture = (name: string) => join(FIXTURES, name);
+export const fixture = (name: string) => join(FIXTURES, name);
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 export const WAIT = { timeout: 20_000 };
 

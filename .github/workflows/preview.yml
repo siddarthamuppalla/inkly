@@ -43,7 +43,7 @@ jobs:
         with: { node-version-file: .nvmrc, cache: pnpm }
       - if: steps.secrets.outputs.ready == 'true'
         run: pnpm i --frozen-lockfile
-      # J-010 validates the annotated PDF download with verify-pdf.
+      # J-009 and J-010 validate saved and annotated PDFs with verify-pdf.
       - if: steps.secrets.outputs.ready == 'true'
         run: sudo apt-get update && sudo apt-get install -y qpdf poppler-utils
       - name: deploy inkly-pr-${{ github.event.pull_request.number }}

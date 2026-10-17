@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   deletePages,
+  fillForm,
   inspect,
   merge,
   pageNumber,
+  readFormFields,
   reorder,
   rotate,
   split,
@@ -32,6 +34,18 @@ describe("page ops inside the Workers runtime", () => {
     const info = await inspect(parts[0] ?? new Uint8Array());
     expect(info).toMatchObject({ pages: 2, encrypted: false });
     expect(info.sizes.map((s) => s.height)).toEqual([101, 100]);
+  });
+
+  it("reads, fills and flattens a form", async () => {
+    const doc = await PDFDocument.create();
+    doc
+      .getForm()
+      .createTextField("name")
+      .addToPage(doc.addPage(), { x: 10, y: 10, width: 200, height: 20 });
+    const filled = await fillForm(await doc.save(), { name: "Ada" }, { flatten: false });
+    expect((await readFormFields(filled)).map((f) => [f.name, f.value])).toEqual([["name", "Ada"]]);
+    const flat = await fillForm(filled, {}, { flatten: true });
+    expect(await readFormFields(flat)).toEqual([]);
   });
 
   it("adds annotations to bytes", async () => {

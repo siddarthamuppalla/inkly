@@ -3,6 +3,7 @@ import type { Locator, Page } from "playwright";
 import { ANNOTATION_JOURNEYS } from "./annotations.ts";
 import { COMPRESS_JOURNEYS } from "./compress.ts";
 import { DOCUMENT_JOURNEYS, openDocuments, reach, uploadFromList, WAIT } from "./documents.ts";
+import { J009 } from "./forms.ts";
 import { PAGE_OP_JOURNEYS } from "./page-ops.ts";
 import { signedIn } from "./sign-in.ts";
 
@@ -300,7 +301,14 @@ const J008: Journey = {
     await signedIn(ctx);
     await page.goto(new URL("/members", baseUrl).toString());
     await page.getByLabel("Email").fill(uniqueEmail("j008-free"));
+    const refused = page.waitForResponse(
+      (res) =>
+        res.request().method() === "POST" &&
+        new URL(res.url()).pathname === "/api/tenant/invitations",
+      { timeout: 30_000 },
+    );
     await page.getByRole("button", { name: "Send invitation" }).click();
+    expect((await refused).status() === 402, "the Free invitation did not return 402");
     expect(
       await visible(page.getByText("The Free plan allows 1 member")),
       "a Free workspace did not refuse a second member",
@@ -395,6 +403,7 @@ export const JOURNEYS: ReadonlyMap<string, Journey> = new Map(
     ...PAGE_OP_JOURNEYS,
     ...COMPRESS_JOURNEYS,
     J008,
+    J009,
     J015,
     ...ANNOTATION_JOURNEYS,
     JFAIL,
