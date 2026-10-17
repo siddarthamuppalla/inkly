@@ -130,6 +130,10 @@ _Avoid_: staging
 
 **Seal**: The single red accent color, reserved for signing, required fields and danger.
 
+**Route coverage**: The `verify-app --all` check that every API route got a successful browser request from some journey.
+
+**Auto-merge**: `auto-merge.yml` merging a green agent PR once every guardrail in `docs/ops/auto-merge.md` holds.
+
 **Checkpoint**: A point in a verify-app journey that screenshots the page in light and dark and runs an axe WCAG 2.1 AA scan of each.
 
 **Fix-layer ladder**: Architecture → static → tests → skills → human review.
