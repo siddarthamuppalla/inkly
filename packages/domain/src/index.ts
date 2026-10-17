@@ -1,4 +1,4 @@
-export type { DocumentId, FolderId, ShareLinkId, TenantId, UserId } from "./ids.ts";
+export type { DocumentId, FolderId, JobId, ShareLinkId, TenantId, UserId } from "./ids.ts";
 export { isWellFormedId } from "./ids.ts";
 export { AppError, isAppError, type AppErrorCode } from "./errors.ts";
 export {
@@ -27,6 +27,17 @@ export {
   VersionInfo,
   VersionListResponse,
 } from "./documents.ts";
+export {
+  COMPRESS_LEVELS,
+  CompressLevel,
+  CompressOutput,
+  CompressRequest,
+  JOB_STATUSES,
+  JobInfo,
+  JobListResponse,
+  JobResponse,
+  type JobStatus,
+} from "./jobs.ts";
 export {
   DeletePagesRequest,
   MergeRequest,

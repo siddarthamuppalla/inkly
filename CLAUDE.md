@@ -71,4 +71,4 @@ Required checks on `main` are listed in `docs/ops/branch-protection.md`; a new
 verify skill adds a CI job there and to that list.
 
 ## Never without a human
-Merge to main, prod deploy, prod data changes, billing, customer messages, secrets, force-push.
+Merge to main (except `auto-merge.yml`'s guarded merges, `docs/ops/auto-merge.md`), prod deploy, prod data changes, billing, customer messages, secrets, force-push.

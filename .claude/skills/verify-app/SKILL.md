@@ -14,7 +14,8 @@ journey, and `summary.md`. Paste the summary path into the PR's Verification Evi
 - When adding a feature: add its row to `feature-map.md` and its automation to
   `packages/testing/src/app/journeys.ts` under the same ID, then run it.
 - After changing this skill: run `--self-test`.
-- CI runs `--self-test`, `J-000`, `J-001`, `J-002`, `J-003`, `J-004`, `J-005`, `J-006`, `J-008` and `J-011` on every PR.
+- CI runs `--self-test` and `--all` on every PR, against `wrangler dev` and against the PR's
+  Cloudflare preview. Auto-merge requires both (`docs/ops/auto-merge.md`).
 - Journeys that need a signed-in user call `signedIn(ctx)` from `src/app/sign-in.ts`: it seeds a
   Tenant and owner through `/__test/seed` and sends `Authorization: Bearer <token>` on
   every later request from the page. It needs the test-hooks secret.
@@ -23,6 +24,7 @@ journey, and `summary.md`. Paste the summary path into the PR's Verification Evi
 ```
 .claude/skills/verify-app/run.sh J-000 [J-001 ...]                  # local wrangler dev
 .claude/skills/verify-app/run.sh --url https://<preview> [--secret S] J-000
+.claude/skills/verify-app/run.sh --all [--url URL] [--secret S]   # every journey + route coverage
 .claude/skills/verify-app/run.sh --self-test
 ```
 
@@ -32,7 +34,7 @@ journey, and `summary.md`. Paste the summary path into the PR's Verification Evi
 | `--url URL` | Target this URL instead of starting `wrangler dev`. |
 | `--secret S` | Test-hooks secret for the target, used to seed. Defaults to `$TEST_HOOKS_SECRET`. Without it, seeding is skipped and noted in the summary. |
 | `--out DIR` | Artifact root. Default `artifacts/verify-app/`. |
-| `--feature-map FILE` | Read journey IDs from FILE instead of `feature-map.md` here. The verifier uses it with `.claude-pr/`, because claude-code-action restores `.claude/` from the base branch on PRs. |
+| `--all` | Run every journey in `feature-map.md`, then check route coverage: read the API's routes from `GET /__test/routes` and fail for each one no journey reached with a 2xx or 3xx from the browser. Requests a journey makes with `page.request` do not count; use `page.evaluate(fetch…)` for a backend-only check. Exits 2 if a journey in `journeys.ts` has no feature-map row. Needs the test-hooks secret. |
 | `--self-test` | Runs the fixture journey `J-FAIL` against a built-in page four times: clean (must pass), console error, 5xx and an accessibility violation (each must fail for that reason). Exits 0 only if all four behave. |
 | `-h`, `--help` | Print usage. |
 

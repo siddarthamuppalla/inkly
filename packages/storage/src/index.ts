@@ -33,6 +33,21 @@ export {
 export { claimPageOp, getUsage, releasePageOp, type UsageRow } from "./usage.ts";
 export { listTenantObjectKeys, MULTIPART_PART_BYTES } from "./versions.ts";
 export {
+  abandonJobCommit,
+  beginJobCommit,
+  completeJob,
+  createJob,
+  failJob,
+  findCommittedVersion,
+  getJob,
+  listDocumentJobs,
+  requeueJob,
+  startJobAttempt,
+  type CompressInput,
+  type JobRow,
+  type JobRowStatus,
+} from "./jobs.ts";
+export {
   createShareLink,
   getShareLink,
   listShareLinks,
