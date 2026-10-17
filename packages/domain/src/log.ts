@@ -19,8 +19,8 @@ export interface AccessDenied extends LinkVisit {
   readonly actorUserId: string;
   readonly action: AccessAction;
   readonly resource: string;
-  /** 401 and 429 only for Share-link visitors (wrong password, too many attempts). */
-  readonly status: 401 | 403 | 404 | 429;
+  /** 401, 422 and 429 only for Share-link visitors (wrong/invalid password, too many attempts). */
+  readonly status: 401 | 403 | 404 | 422 | 429;
   readonly at: number;
 }
 
