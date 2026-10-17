@@ -5,6 +5,17 @@
   "compatibility_date": "2026-10-01",
   // Better-Auth needs AsyncLocalStorage (node:async_hooks).
   "compatibility_flags": ["nodejs_compat"],
+  // Workers Logs: every deploy applies this, so dashboard-only settings would be reset.
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true,
+    },
+    "traces": { "enabled": false, "head_sampling_rate": 1, "persist": true },
+    "issue_detection": { "enabled": false },
+  },
   // ADR-0002: the SPA in apps/web is served as static assets by this Worker.
   "assets": {
     "directory": "../../apps/web/dist",
@@ -21,4 +32,30 @@
   ],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "inkly-files" }],
   "kv_namespaces": [{ "binding": "KV", "id": "00000000000000000000000000000000" }],
+  // T1.4b: Jobs. The API enqueues; this same Worker consumes (workers/jobs).
+  "queues": {
+    "producers": [{ "binding": "JOBS", "queue": "inkly-jobs" }],
+    "consumers": [
+      {
+        "queue": "inkly-jobs",
+        "max_batch_size": 1,
+        // MAX_DELIVERIES in workers/jobs/src/consumer.ts is max_retries + 1.
+        "max_retries": 2,
+      },
+    ],
+  },
+  // pdf-engine (containers/pdf-engine). Needs Workers Paid. `wrangler deploy` builds the image.
+  "containers": [
+    {
+      "class_name": "PdfEngine",
+      "image": "../../containers/pdf-engine/Dockerfile",
+      "instance_type": "basic",
+      // At least INSTANCES in workers/jobs/src/engine.ts.
+      "max_instances": 2,
+    },
+  ],
+  "durable_objects": { "bindings": [{ "name": "PDF_ENGINE", "class_name": "PdfEngine" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PdfEngine"] }],
+  // Local dev and verify-app call a local pdf-engine process instead (workers/jobs/src/env.ts).
+  "dev": { "enable_containers": false },
 }

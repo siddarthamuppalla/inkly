@@ -3,6 +3,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # auto-merge.yml starts CI on main itself: its merges use the workflow token, which starts no push run.
+  workflow_dispatch:
 permissions:
   contents: read
 env:
@@ -43,9 +45,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-        with: { chromium: "true" }
+        # pdf-tools: J-007 runs Jobs in a local pdf-engine process (gs, qpdf).
+        with: { chromium: "true", pdf-tools: "true" }
       - run: .claude/skills/verify-app/run.sh --self-test
-      - run: .claude/skills/verify-app/run.sh J-000 J-001 J-002 J-003 J-004 J-005 J-008
+      # Every journey in feature-map.md, and a failure for any API route no journey reached.
+      - run: .claude/skills/verify-app/run.sh --all
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -74,15 +78,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version-file: .nvmrc }
       - run: node scripts/check-prod-config.mjs
-  workflows:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: scripts/bot-guard.test.sh
-      - name: actionlint (runs shellcheck on every run block)
-        run: |
-          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
-          ./actionlint -color
   secrets:
     runs-on: ubuntu-latest
     permissions:
@@ -94,3 +89,65 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc }
+      - run: scripts/bot-guard.test.sh
+      - run: node --test scripts/auto-merge.test.mjs scripts/cf-lib.test.mjs
+      - name: actionlint (runs shellcheck on every run block)
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          ./actionlint -color
+  # One PASS/FAIL comment per PR, updated in place on every push (T1.7, token-free).
+  verdict:
+    if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    needs:
+      [
+        check,
+        test,
+        verify-pdf,
+        verify-perf,
+        verify-app,
+        verify-tenancy,
+        audit,
+        prod-config,
+        secrets,
+        workflows,
+      ]
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        with:
+          script: |
+            const needs = Object.entries(JSON.parse(process.env.NEEDS));
+            const pass = needs.every(([, job]) => job.result === "success");
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const rows = needs.map(([name, job]) => `| \`${name}\` | ${job.result === "success" ? "pass" : job.result} |`);
+            const marker = "<!-- inkly-verifier -->";
+            const sha = context.payload.pull_request.head.sha.slice(0, 7);
+            const body = [
+              marker,
+              `**Verifier on ${sha}**`,
+              "",
+              `Verdict: ${pass ? "PASS" : "FAIL"}`,
+              "",
+              "| CI job | Result |",
+              "|--------|--------|",
+              ...rows,
+              "",
+              `[Workflow run](${run})`,
+            ].join("\n");
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const mine = comments.find((c) => c.body?.startsWith(marker));
+            if (mine) await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            if (!pass) core.setFailed("a CI job did not pass");

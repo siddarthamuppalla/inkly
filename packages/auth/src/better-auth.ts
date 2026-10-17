@@ -6,6 +6,7 @@ import { betterAuth } from "better-auth";
 import { bearer, emailOTP, magicLink, organization } from "better-auth/plugins";
 import { adminAc, memberAc, ownerAc } from "better-auth/plugins/organization/access";
 
+import { reportingEmailFailure } from "./email-failures.ts";
 import { emailSender } from "./email.ts";
 import type { AuthEnv } from "./env.ts";
 import { mintTenantId, mintUserId, newId } from "./ids.ts";
@@ -44,7 +45,7 @@ function options(env: AuthEnv, baseURL: string, deferred: Deferred) {
   const secret = env.BETTER_AUTH_SECRET;
   if (!secret) throw new AppError("internal", "BETTER_AUTH_SECRET is not set");
   const send = (to: string, subject: string, text: string) =>
-    emailSender(env).send({ to, subject, text });
+    reportingEmailFailure(() => emailSender(env).send({ to, subject, text }));
   const google =
     env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
       ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }

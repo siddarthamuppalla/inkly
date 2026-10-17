@@ -21,7 +21,7 @@ async function failure(res: Response): Promise<ApiError> {
   return new ApiError(res.status, code, message);
 }
 
-async function call<S extends z.ZodType>(
+export async function call<S extends z.ZodType>(
   schema: S,
   path: string,
   init: RequestInit = {},
@@ -31,7 +31,7 @@ async function call<S extends z.ZodType>(
   return schema.parse(await res.json());
 }
 
-const jsonInit = (method: string, body: unknown): RequestInit => ({
+export const jsonInit = (method: string, body: unknown): RequestInit => ({
   method,
   headers: { "content-type": "application/json" },
   body: JSON.stringify(body),

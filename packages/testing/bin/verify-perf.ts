@@ -5,12 +5,13 @@ import { parseArgs } from "node:util";
 
 import { startEngine, type LocalEngine } from "../src/perf/engine.ts";
 import { benchmark, perfOps, RUNS, WARMUPS } from "../src/perf/ops.ts";
+import { remoteOps } from "../src/perf/remote.ts";
 import { ABSOLUTE_P95_MS, gate, type Baseline, type OpStats } from "../src/perf/stats.ts";
 
 const USAGE = `usage:
   verify-perf [--update-baseline]
   verify-perf --self-test
-  verify-perf --url URL   (not yet available)`;
+  verify-perf --url URL [--secret S]`;
 
 const repoRoot = resolve(import.meta.dirname, "../../..");
 const baselinePath = resolve(repoRoot, ".claude/skills/verify-perf/perf-baseline.json");
@@ -33,6 +34,26 @@ function print(results: Results, baseline: Baseline | undefined): void {
 
 function fmt(n: number): string {
   return n.toFixed(1);
+}
+
+/**
+ * Times the page-op API at `url` against the 3 s bound only: a deployed environment's
+ * network and region make a stored baseline meaningless there.
+ */
+async function remote(url: string, secret: string | undefined): Promise<number> {
+  if (secret === undefined || secret === "") {
+    console.log("FAIL --url needs the target's test-hooks secret (--secret or $TEST_HOOKS_SECRET)");
+    return 1;
+  }
+  console.log(`seeding a Pro owner and uploading fixtures to ${url}…`);
+  const ops = await remoteOps(repoRoot, url, secret);
+  console.log(`${String(RUNS)} runs per op after ${String(WARMUPS)} warm-up…`);
+  const results = await benchmark(ops);
+  print(results, undefined);
+  const failures = gate(results, scaled(results, 1));
+  for (const f of failures) console.log(`FAIL ${f}`);
+  console.log(failures.length === 0 ? "verify-perf --url: PASS" : "verify-perf --url: FAIL");
+  return failures.length === 0 ? 0 : 1;
 }
 
 function readBaseline(): Baseline | undefined {
@@ -113,6 +134,7 @@ async function main(): Promise<number> {
   const { values } = parseArgs({
     options: {
       url: { type: "string" },
+      secret: { type: "string" },
       "update-baseline": { type: "boolean" },
       "self-test": { type: "boolean" },
       help: { type: "boolean", short: "h" },
@@ -123,8 +145,7 @@ async function main(): Promise<number> {
     return 0;
   }
   if (values.url !== undefined) {
-    console.error("verify-perf --url: not yet: needs page-op API (T1.3b)");
-    return 2;
+    return remote(values.url, values.secret ?? process.env["TEST_HOOKS_SECRET"]);
   }
   if (values["self-test"] === true) return selfTest();
 

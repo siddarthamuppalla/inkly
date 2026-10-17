@@ -2,6 +2,7 @@ declare const tenantIdBrand: unique symbol;
 declare const documentIdBrand: unique symbol;
 declare const userIdBrand: unique symbol;
 declare const folderIdBrand: unique symbol;
+declare const jobIdBrand: unique symbol;
 
 /** A Tenant's identifier. Only `packages/auth` mints one, after a membership check (ADR-0004). */
 export type TenantId = string & { readonly [tenantIdBrand]: true };
@@ -11,6 +12,9 @@ export type DocumentId = string & { readonly [documentIdBrand]: true };
 
 /** A Folder's identifier, unique within its Tenant. */
 export type FolderId = string & { readonly [folderIdBrand]: true };
+
+/** A Job's identifier, unique within its Tenant. */
+export type JobId = string & { readonly [jobIdBrand]: true };
 
 /** A User's identifier. Only `packages/auth` mints one. */
 export type UserId = string & { readonly [userIdBrand]: true };

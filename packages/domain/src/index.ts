@@ -1,10 +1,11 @@
-export type { DocumentId, FolderId, TenantId, UserId } from "./ids.ts";
+export type { DocumentId, FolderId, JobId, TenantId, UserId } from "./ids.ts";
 export { isWellFormedId } from "./ids.ts";
 export { AppError, isAppError, type AppErrorCode } from "./errors.ts";
 export {
   assertFileSizeAllowed,
   assertUploadAllowed,
   MiB,
+  pageOpLimitError,
   PLAN_LIMITS,
   type Plan,
   type PlanLimits,
@@ -24,3 +25,23 @@ export {
   VersionInfo,
   VersionListResponse,
 } from "./documents.ts";
+export {
+  COMPRESS_LEVELS,
+  CompressLevel,
+  CompressOutput,
+  CompressRequest,
+  JOB_STATUSES,
+  JobInfo,
+  JobListResponse,
+  JobResponse,
+  type JobStatus,
+} from "./jobs.ts";
+export {
+  DeletePagesRequest,
+  MergeRequest,
+  parseRanges,
+  ReorderRequest,
+  RotateRequest,
+  SplitRange,
+  SplitRequest,
+} from "./page-ops.ts";

@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@inkly/auth": "workspace:*",
+    "@inkly/jobs": "workspace:*",
     "@inkly/pdf": "workspace:*",
     "@inkly/storage": "workspace:*",
     "hono": "4.13.13",

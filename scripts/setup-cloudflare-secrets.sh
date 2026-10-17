@@ -17,6 +17,9 @@ Inkly preview environments need a Cloudflare API token and your account ID.
      - D1
      - Workers R2 Storage
      - Workers KV Storage
+     - Queues
+     - Containers
+   The account needs Workers Paid for Containers (T1.4b).
    Limit "Account Resources" to your Inkly account. No Zone permissions are needed.
 2. Copy the token once it is shown.
 3. Find your Account ID on the right-hand side of any Workers & Pages page.

@@ -8,6 +8,7 @@ rerun this only to add or change a fixture, then update expectations.json.
 import io
 import os
 import random
+import subprocess
 
 from PIL import Image, ImageDraw, ImageFilter
 from pypdf import PdfReader, PdfWriter
@@ -83,6 +84,16 @@ def encrypted():
     write("encrypted.pdf", buf.getvalue())
 
 
+def encrypted_objstm():
+    # Like most real-world protected PDFs (government forms, statements): AES-256 with an
+    # empty user password and the page tree inside encrypted object streams.
+    subprocess.run(
+        ["qpdf", "--object-streams=generate", "--encrypt", "", "inkly-owner", "256",
+         "--modify=none", "--", path("tiny.pdf"), path("encrypted-objstm.pdf")],
+        check=True,
+    )
+
+
 def forms():
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=letter, invariant=1)
@@ -145,6 +156,7 @@ if __name__ == "__main__":
     multi(50)
     scanned()
     encrypted()
+    encrypted_objstm()
     forms()
     rotated()
     huge_image()

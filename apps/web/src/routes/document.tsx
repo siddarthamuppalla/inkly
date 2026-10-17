@@ -3,7 +3,9 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, type SyntheticEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
+import { CompressPanel } from "../components/compress.tsx";
 import { Page } from "../components/page.tsx";
+import { PageEdits } from "../components/page-edits.tsx";
 import { PageCanvas, usePdf } from "../components/pdf-pages.tsx";
 import { Badge } from "../components/ui/badge.tsx";
 import { Button } from "../components/ui/button.tsx";
@@ -71,6 +73,8 @@ function Viewer({ doc }: { readonly doc: DocumentInfo }) {
           className="flex flex-col gap-6 md:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1"
         >
           <Actions doc={doc} />
+          <PageEdits key={doc.currentVersion} doc={doc} pdf={pdf} />
+          <CompressPanel doc={doc} />
           <Versions doc={doc} />
         </aside>
         <nav aria-label="Page thumbnails" className="hidden md:block xl:col-start-1 xl:row-start-1">

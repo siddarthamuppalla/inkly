@@ -35,7 +35,8 @@ function run(cmd: string, args: readonly string[], cwd: string, env: NodeJS.Proc
 async function waitForHealth(url: string, child: ChildProcess, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error(`wrangler dev exited (${String(child.exitCode)})`);
+    if (child.exitCode !== null)
+      throw new Error(`${url} process exited (${String(child.exitCode)})`);
     try {
       const res = await fetch(url);
       if (res.status < 500) return;
@@ -47,10 +48,37 @@ async function waitForHealth(url: string, child: ChildProcess, timeoutMs: number
   throw new Error(`wrangler dev did not answer ${url} within ${String(timeoutMs)} ms`);
 }
 
+/** Starts containers/pdf-engine as a local process (needs gs and qpdf) and returns its URL. */
+async function startPdfEngine(
+  repoRoot: string,
+  log: string[],
+): Promise<{ url: string; child: ChildProcess }> {
+  const port = await freePort();
+  const child = spawn(
+    process.execPath,
+    [
+      "--disable-warning=ExperimentalWarning",
+      join(repoRoot, "containers/pdf-engine/src/server.ts"),
+    ],
+    { env: { ...process.env, PORT: String(port) }, stdio: ["ignore", "pipe", "pipe"] },
+  );
+  child.stdout.on("data", (d: Buffer) => log.push(`[pdf-engine] ${d.toString()}`));
+  child.stderr.on("data", (d: Buffer) => log.push(`[pdf-engine] ${d.toString()}`));
+  const url = `http://127.0.0.1:${String(port)}`;
+  try {
+    await waitForHealth(`${url}/health`, child, 10_000);
+  } catch (err) {
+    child.kill();
+    throw err;
+  }
+  return { url, child };
+}
+
 /**
  * Builds the SPA, applies D1 migrations to a throwaway local state dir, and starts
  * `wrangler dev` with test hooks enabled behind a random per-run secret, a random
- * Better-Auth secret and mail captured in the Outbox.
+ * Better-Auth secret and mail captured in the Outbox. Jobs run in a local pdf-engine
+ * process instead of the Container (`dev.enable_containers` is false).
  */
 export async function startLocalWorker(
   repoRoot: string,
@@ -64,6 +92,7 @@ export async function startLocalWorker(
   run("pnpm", ["--filter", "@inkly/web", "build"], repoRoot, env);
   run(wrangler, ["d1", "migrations", "apply", "DB", "--local", "--persist-to", state], apiDir, env);
 
+  const engine = await startPdfEngine(repoRoot, log);
   const port = await freePort();
   const secret = randomBytes(24).toString("hex");
   const child = spawn(
@@ -84,6 +113,8 @@ export async function startLocalWorker(
       `BETTER_AUTH_SECRET:${randomBytes(32).toString("hex")}`,
       "--var",
       "EMAIL_PROVIDER:outbox",
+      "--var",
+      `PDF_ENGINE_URL:${engine.url}`,
       ...Object.entries(extraVars).flatMap(([k, v]) => ["--var", `${k}:${v}`]),
     ],
     { cwd: apiDir, env, detached: true, stdio: ["ignore", "pipe", "pipe"] },
@@ -92,6 +123,7 @@ export async function startLocalWorker(
   child.stderr.on("data", (d: Buffer) => log.push(d.toString()));
 
   const stop = () => {
+    engine.child.kill();
     if (child.pid !== undefined && child.exitCode === null) {
       try {
         process.kill(-child.pid, "SIGTERM");
