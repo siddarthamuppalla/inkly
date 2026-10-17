@@ -22,7 +22,7 @@ its own folder and Document. Then A tries to reach B's data every known way:
 Pass means every attempt returned 403 or 404. A's access log must hold exactly one
 denial entry per denied attempt, and B's Documents and folders must be unchanged.
 Control requests also confirm that A can reach its own Document, content, Versions and
-folder (and that its two content reads were logged), so a broken route can't pass as a
+folder (and that its three content reads, the form read among them, were logged), so a broken route can't pass as a
 denial.
 
 ## When to run it

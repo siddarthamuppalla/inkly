@@ -11,6 +11,7 @@ const FIXTURES = [
   "encrypted.pdf",
   "encrypted-objstm.pdf",
   "malformed.pdf",
+  "forms.pdf",
 ];
 
 export default defineConfig(async () => {

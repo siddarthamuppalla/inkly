@@ -43,6 +43,9 @@ jobs:
         with: { node-version-file: .nvmrc, cache: pnpm }
       - if: steps.secrets.outputs.ready == 'true'
         run: pnpm i --frozen-lockfile
+      # J-009 checks the saved bytes with verify-pdf (qpdf, pdftotext).
+      - if: steps.secrets.outputs.ready == 'true'
+        run: sudo apt-get update && sudo apt-get install -y qpdf poppler-utils
       - name: deploy inkly-pr-${{ github.event.pull_request.number }}
         if: steps.secrets.outputs.ready == 'true'
         id: deploy
@@ -67,6 +70,8 @@ jobs:
           TEST_HOOKS_SECRET="$(cat "$RUNNER_TEMP/preview-secret")"
           export TEST_HOOKS_SECRET
           pnpm --filter @inkly/testing exec playwright install --with-deps chromium
+          # J-009 runs verify-pdf (qpdf, pdfinfo, pdftotext) on the Versions it saves.
+          sudo apt-get install -y qpdf poppler-utils
           .claude/skills/verify-app/run.sh --url "$URL" --all
           .claude/skills/verify-tenancy/run.sh --url "$URL"
       # Reported, not gating: on real Cloudflare, split is over the 3 s bound on main today (#54).
