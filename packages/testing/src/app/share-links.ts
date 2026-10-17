@@ -192,4 +192,77 @@ const J011: Journey = {
   },
 };
 
-export const SHARE_JOURNEYS: readonly Journey[] = [J011];
+const J012: Journey = {
+  id: "J-012",
+  title: "Show a Document's activity",
+  async run(ctx) {
+    const { page, baseUrl, expect } = ctx;
+    const owner = await signedIn(ctx, { plan: "pro" });
+    const id = await uploadByApi(ctx, owner, "tiny.pdf");
+    const viewer = new URL(`/documents/${id}`, baseUrl).toString();
+    await page.goto(viewer);
+    await pagesRendered(ctx, 1, "viewer");
+    await page.getByLabel("Title").fill("Activity check");
+    await page.getByRole("button", { name: "Rename" }).click();
+    await reach(
+      ctx,
+      page.getByRole("heading", { level: 1, name: "Activity check" }).waitFor(WAIT),
+      "rename did not apply",
+    );
+    const link = await createLink(ctx, { expiry: "7 days", allowDownload: true });
+
+    await signOut(ctx);
+    await page.goto(link);
+    await pagesRendered(ctx, 1, "share link");
+    const [download] = await Promise.all([
+      page.waitForEvent("download", WAIT),
+      page.getByRole("link", { name: "Download" }).click(),
+    ]);
+    await download.path();
+
+    await page.setExtraHTTPHeaders({ authorization: `Bearer ${owner.token}` });
+    await page.goto(viewer);
+    const entries = page
+      .getByRole("list", { name: "Activity on Activity check" })
+      .getByTestId("activity-entry");
+    await reach(ctx, entries.nth(3).waitFor(WAIT), "the Activity panel lists fewer than 4 entries");
+    const texts = await entries.allTextContents();
+    const newestVisit = texts.find((t) => t.startsWith("Someone with a share link")) ?? "";
+    expect(
+      newestVisit.includes("Someone with a share link downloaded") &&
+        newestVisit.includes("Chrome"),
+      `newest share-link entry reads "${newestVisit}", expected a download with the browser's user agent`,
+    );
+    expect(
+      texts.some((t) => t.includes("Someone with a share link viewed")),
+      "the share-link view is not listed",
+    );
+    const me = `Seed`;
+    expect(
+      texts.some((t) => t.startsWith(me) && t.includes(" edited")),
+      "the rename is not listed as an edit by the owner",
+    );
+    expect(
+      texts.some((t) => t.startsWith(me) && t.includes(" viewed")),
+      "the owner's view is not listed",
+    );
+    await ctx.checkpoint("activity");
+
+    await page.goto(new URL("/links", baseUrl).toString());
+    const row = page.getByTestId("share-link-row").first();
+    await reach(ctx, row.waitFor(WAIT), "/links does not list the link");
+    await row.locator("summary").click();
+    const opens = row
+      .getByRole("list", { name: "Activity on this link" })
+      .getByTestId("activity-entry");
+    await reach(ctx, opens.first().waitFor(WAIT), "/links does not show the link's own opens");
+    const openTexts = await opens.allTextContents();
+    expect(
+      openTexts.length === 2 && openTexts.every((t) => t.startsWith("Someone with a share link")),
+      `the link's opens read ${JSON.stringify(openTexts)}, expected its view and download`,
+    );
+    await ctx.checkpoint("link-opens");
+  },
+};
+
+export const SHARE_JOURNEYS: readonly Journey[] = [J011, J012];

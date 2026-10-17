@@ -12,6 +12,27 @@ import type { Env } from "./env.ts";
 export type TenantVars = { session: Session; tenantId: TenantId };
 export type TenantContext = Context<{ Bindings: Env; Variables: TenantVars }>;
 
+/**
+ * The Document a `/api/documents/:id/...` request concerns, for its activity (T2.4).
+ * Only Document-shaped ids count, so `/api/documents/merge` concerns none.
+ */
+export function documentInPath(path: string): string | null {
+  return /^\/api\/documents\/(doc_[A-Za-z0-9]{1,60})(?:\/|$)/.exec(path)?.[1] ?? null;
+}
+
+function documentOf(path: string): { documentId?: string } {
+  const id = documentInPath(path);
+  return id === null ? {} : { documentId: id };
+}
+
+/** Where a request came from, for the access log. */
+function origin(c: TenantContext): { ip: string | null; userAgent: string | null } {
+  return {
+    ip: c.req.header("cf-connecting-ip") ?? null,
+    userAgent: c.req.header("user-agent") ?? null,
+  };
+}
+
 /** Refuses a request, writing an access-log entry against the caller's own tenant. */
 export async function denyAccess(
   c: TenantContext,
@@ -26,6 +47,8 @@ export async function denyAccess(
     action,
     resource,
     status,
+    ...documentOf(c.req.path),
+    ...origin(c),
   });
   logEvent(entry);
   await appendAccessLog(session.tenantId, c.env, entry);
@@ -66,6 +89,8 @@ export async function grantAccess(
     actorUserId: session.userId,
     action,
     resource,
+    ...documentOf(c.req.path),
+    ...origin(c),
   });
   logEvent(entry);
   await appendAccessLog(session.tenantId, c.env, entry);

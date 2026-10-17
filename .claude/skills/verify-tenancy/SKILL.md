@@ -15,6 +15,7 @@ its own folder and Document. Then A tries to reach B's data every known way:
 - by fetching B's content and Version content (the R2 objects);
 - by listing, adding and restoring B's Versions;
 - by uploading into, nesting under, renaming, moving into and deleting B's folder;
+- by reading B's Document activity and B's Share link activity;
 - by sharing B's Document, listing B's Share links and revoking B's link; and it checks
   that A's link token serves A's Document only, whatever tenant or Document the request names.
 

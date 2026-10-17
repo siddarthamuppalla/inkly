@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, type SyntheticEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
+import { ActivityPanel } from "../components/activity-panel.tsx";
 import { CompressPanel } from "../components/compress.tsx";
 import { FormPanel } from "../components/form-panel.tsx";
 import { Page } from "../components/page.tsx";
@@ -80,6 +81,7 @@ function Viewer({ doc }: { readonly doc: DocumentInfo }) {
           <CompressPanel doc={doc} />
           <SharePanel doc={doc} />
           <Versions doc={doc} />
+          <ActivityPanel doc={doc} />
         </aside>
         <nav aria-label="Page thumbnails" className="hidden md:block xl:col-start-1 xl:row-start-1">
           <ol className="sticky top-6 flex max-h-[calc(100dvh-3rem)] flex-col gap-3 overflow-y-auto p-1">
