@@ -30,4 +30,15 @@ app.route("/api/documents", documentRoutes);
 app.use("/api/folders/*", requireTenant);
 app.route("/api/folders", folderRoutes);
 
+// verify-app fails a full run when one of these routes got no successful request from any
+// journey. Registered after the `/__test` guard, so it is a 404 without the secret.
+app.get("/__test/routes", (c) => {
+  const routes = new Map(
+    app.routes
+      .filter((r) => r.method !== "ALL" && !r.path.startsWith("/__test"))
+      .map((r) => [`${r.method} ${r.path}`, { method: r.method, path: r.path }]),
+  );
+  return c.json({ routes: [...routes.values()] });
+});
+
 export default app;
