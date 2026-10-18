@@ -8,7 +8,8 @@
     "./health": "./src/health.ts"
   },
   "dependencies": {
-    "@inkly/domain": "workspace:*"
+    "@inkly/domain": "workspace:*",
+    "kysely": "0.29.6"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261015.1"
