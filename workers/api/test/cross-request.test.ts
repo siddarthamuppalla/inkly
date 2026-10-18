@@ -50,12 +50,19 @@ afterEach(() => {
 
 describe("an auth request its client cancels (#72)", () => {
   it("does not leave later requests in the isolate without a response, reads or writes", async () => {
+    // A deployed Worker evaluates its whole bundle before it serves a request (wrangler
+    // inlines Better-Auth's dynamic imports). Under vitest those imports are fetched from
+    // the module server on first use, inside whichever request gets there first, so
+    // cancelling that request would strand Better-Auth's init for a test-only reason.
+    // One uncancelled auth request on another origin loads them first.
+    expect(await statusWithin(`http://warm-up.inkly.test${GET_SESSION}`, 20_000)).toBe(200);
     restoreD1 = slowDownD1(SLOW_MS);
     // A new origin, so this is the first auth request the isolate serves for it.
     const origin = "http://cancelled-first.inkly.test";
     await cancelledAfter(`${origin}${GET_SESSION}`, 50);
     // Every API route authenticates through Better-Auth, so reads and writes both stall.
-    const budget = 10 * SLOW_MS + 2000;
+    // A hung request never answers, so a wide budget only absorbs a loaded test run.
+    const budget = 20_000;
     const statuses = await Promise.all([
       statusWithin(`${origin}${GET_SESSION}`, budget),
       statusWithin(`${origin}/api/documents`, budget),
@@ -67,5 +74,5 @@ describe("an auth request its client cancels (#72)", () => {
       }),
     ]);
     expect(statuses).toEqual([200, 401, 401, 401]);
-  }, 30_000);
+  }, 60_000);
 });
