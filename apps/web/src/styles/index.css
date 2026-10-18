@@ -13,6 +13,9 @@
   --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
   --font-sans: "Atkinson Hyperlegible Next Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  /* Typed signatures: the system's own handwriting faces, no webfont. */
+  --font-script:
+    "Segoe Script", "Bradley Hand", "Snell Roundhand", "URW Chancery L", "Apple Chancery", cursive;
   --shadow-*: initial;
 }
 

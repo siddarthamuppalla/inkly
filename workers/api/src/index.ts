@@ -15,6 +15,7 @@ import { jobRoutes } from "./jobs.ts";
 import { pageOpRoutes } from "./page-ops.ts";
 import { sharedRoutes, shareLinkRoutes } from "./share-links.ts";
 import { requestLog } from "./request-log.ts";
+import { signingRoutes } from "./signing.ts";
 import { requireTenant } from "./tenant-context.ts";
 import { testHooks } from "./test-hooks.ts";
 
@@ -51,6 +52,7 @@ app.route("/api", jobRoutes);
 app.use("/api/share-links/*", requireTenant);
 app.route("/api/share-links", shareLinkRoutes);
 app.route("/api/share", sharedRoutes);
+app.route("/api/sign", signingRoutes);
 app.use("/api/envelopes/*", requireTenant);
 app.route("/api/envelopes", envelopeRoutes);
 app.route("/api", sealCertificateRoutes);
