@@ -14,7 +14,7 @@ export function missingFields(fields: readonly SignerField[], values: FieldValue
   return fields.filter((f) => f.required && !fieldFilled(f.kind, values[f.id]));
 }
 
-/** The Field "Next field" goes to: the first unfilled one after `current`, wrapping round. */
+/** The Field "Next field" goes to: the first required, unfilled one after `current`, wrapping round. */
 export function nextField(
   ordered: readonly SignerField[],
   values: FieldValues,
@@ -23,7 +23,7 @@ export function nextField(
   const start = current === null ? -1 : ordered.findIndex((f) => f.id === current);
   for (let step = 1; step <= ordered.length; step++) {
     const field = ordered[(start + step) % ordered.length];
-    if (field && !fieldFilled(field.kind, values[field.id])) return field;
+    if (field?.required && !fieldFilled(field.kind, values[field.id])) return field;
   }
   return null;
 }

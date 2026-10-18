@@ -38,8 +38,8 @@ describe("inPageOrder", () => {
 });
 
 describe("nextField", () => {
-  const ordered = inPageOrder([sig2, date1, sig1, box1]);
-  it("walks unfilled fields in page order, skipping dates and filled ones, and wraps", () => {
+  const ordered = inPageOrder([sig2, date1, sig1, box1, text1]);
+  it("walks required unfilled fields in page order, skipping dates, optional and filled ones, and wraps", () => {
     expect(nextField(ordered, {}, null)?.id).toBe("fld_box");
     expect(nextField(ordered, { fld_box: "true" }, null)?.id).toBe("fld_sig1");
     expect(nextField(ordered, {}, "fld_sig1")?.id).toBe("fld_sig2");
