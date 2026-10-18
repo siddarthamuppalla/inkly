@@ -142,3 +142,21 @@ export {
   type ChainCheck,
   type JsonValue,
 } from "./audit.ts";
+export {
+  CONSENT_TEXT,
+  everySignerSigned,
+  fieldFilled,
+  fieldValueProblem,
+  nextTurn,
+  SIGNATURE_IMAGE_MAX_BYTES,
+  SIGNER_GRANT_TTL_MS,
+  SignerCode,
+  SignerDecline,
+  SignerDone,
+  SignerEnvelope,
+  SignerField,
+  SignerSign,
+  SIGNING_CODE,
+  signingDate,
+  TEXT_FIELD_MAX,
+} from "./signing.ts";
