@@ -12,16 +12,21 @@ Paste its output into the PR's Verification Evidence block.
 - After building or changing anything that writes PDF bytes (merge, split, rotate,
   compress, fill, sign, export): run it on the output with `--expect-pages`, and with
   `--golden` when the visual result matters.
+- After changing anything that seals PDFs (`sealPdf`, Envelope finalize): run it on the
+  sealed output with `--signed <seal certificate PEM>`.
 - After changing `fixtures/pdfs/`: run `--corpus fixtures/pdfs`.
 - CI runs `--corpus fixtures/pdfs` on every PR.
 
 ## Requirements
 `qpdf` and `poppler-utils` (`pdfinfo`, `pdftoppm`) on PATH, Node 22, and `pnpm i`
 already run. On Ubuntu: `sudo apt-get install -y qpdf poppler-utils`.
+`--signed` (and `pnpm test` in `packages/pdf`) also needs pyHanko, pinned in
+`requirements.txt` next to this file: `pip install -r .claude/skills/verify-pdf/requirements.txt`
+(Python 3.10+). CI installs it through the setup action's `pdf-tools` input.
 
 ## Usage
 ```
-.claude/skills/verify-pdf/run.sh <file.pdf> [--expect-pages N] [--golden DIR [--threshold PCT] [--update-golden]]
+.claude/skills/verify-pdf/run.sh <file.pdf> [--expect-pages N] [--signed CERT.pem] [--golden DIR [--threshold PCT] [--update-golden]]
 .claude/skills/verify-pdf/run.sh --corpus DIR
 ```
 
@@ -32,6 +37,7 @@ qpdf messages are printed.
 | Flag | Meaning |
 |------|---------|
 | `--expect-pages N` | Fail unless the document has exactly N pages. |
+| `--signed CERT.pem` | Run `pyhanko sign validate --trust CERT.pem --trust-replace`. Fails unless the file has at least one signature and every one is `INTACT:TRUSTED,UNTOUCHED` (cryptographically valid, chains to CERT.pem only, and covers the whole file). Prints one `signature ok:` line per signature. |
 | `--golden DIR` | Render every page with `pdftoppm -r 72 -png` and compare each to `DIR/page-*.png` with pixelmatch. Fails when a page differs by more than the threshold, or when the page counts differ. |
 | `--threshold PCT` | Largest allowed share of differing pixels per page, in percent. Default `0.1` (0.1%). |
 | `--update-golden` | With `--golden`, replace `DIR` with the current render instead of comparing. Commit goldens only after looking at them. |

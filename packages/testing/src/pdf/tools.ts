@@ -6,10 +6,14 @@ export interface ToolResult {
   readonly stderr: string;
 }
 
-export function runTool(cmd: string, args: readonly string[]): ToolResult {
+export function runTool(
+  cmd: string,
+  args: readonly string[],
+  install = "install qpdf and poppler-utils",
+): ToolResult {
   const r = spawnSync(cmd, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   if (r.error) {
-    throw new Error(`${cmd} could not run (${r.error.message}); install qpdf and poppler-utils`);
+    throw new Error(`${cmd} could not run (${r.error.message}); ${install}`);
   }
   return { status: r.status ?? 1, stdout: r.stdout, stderr: r.stderr };
 }
@@ -59,6 +63,36 @@ export function pdfInfo(file: string): PdfInfo {
     });
   }
   return { pages, encrypted, form, pageInfo };
+}
+
+export interface SignatureCheck {
+  readonly ok: boolean;
+  /** One line per signature field, as `pyhanko sign validate` prints it. */
+  readonly signatures: readonly string[];
+  readonly detail: string;
+}
+
+/**
+ * `pyhanko sign validate` trusting only `certPem`. Passes when the file has at least one
+ * signature and every one is INTACT, TRUSTED and UNTOUCHED (it covers the whole file).
+ */
+export function pyhankoValidate(file: string, certPem: string): SignatureCheck {
+  const r = runTool(
+    "pyhanko",
+    ["sign", "validate", "--trust", certPem, "--trust-replace", file],
+    "pip install -r .claude/skills/verify-pdf/requirements.txt",
+  );
+  const signatures = r.stdout
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l !== "");
+  const valid = (l: string) => /:INTACT:TRUSTED,UNTOUCHED$/.test(l);
+  const ok = r.status === 0 && signatures.length > 0 && signatures.every(valid);
+  const detail =
+    signatures.length === 0 && r.status === 0
+      ? "no signatures found"
+      : [...signatures, r.stderr.trim()].filter((l) => l !== "").join("; ");
+  return { ok, signatures, detail };
 }
 
 /** Renders every page with `pdftoppm -r 72 -png` to `${outDir}/page-N.png`. */
