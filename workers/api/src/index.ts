@@ -14,6 +14,7 @@ import { formRoutes } from "./forms.ts";
 import { jobRoutes } from "./jobs.ts";
 import { pageOpRoutes } from "./page-ops.ts";
 import { sharedRoutes, shareLinkRoutes } from "./share-links.ts";
+import { requestLog } from "./request-log.ts";
 import { signingRoutes } from "./signing.ts";
 import { requireTenant } from "./tenant-context.ts";
 import { testHooks } from "./test-hooks.ts";
@@ -27,6 +28,7 @@ export { PdfEngine } from "@inkly/jobs";
 const app = new Hono<{ Bindings: Env }>();
 
 app.onError(onAppError);
+app.use("*", requestLog);
 
 app.get("/health", async (c) => {
   const bindings = await probeBindings(c.env);

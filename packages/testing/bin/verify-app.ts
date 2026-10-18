@@ -5,7 +5,7 @@ import { parseArgs } from "node:util";
 
 import { featureMapIds } from "../src/app/feature-map.ts";
 import { JOURNEYS, type Journey } from "../src/app/journeys.ts";
-import { startLocalWorker, type LocalWorker } from "../src/app/local-server.ts";
+import { startLocalWorker, workerErrors, type LocalWorker } from "../src/app/local-server.ts";
 import { routeCoverage, type ApiRoute, type RouteCoverage } from "../src/app/route-coverage.ts";
 import { runJourneys, writeSummary, type JourneyResult } from "../src/app/runner.ts";
 import { startFixtureServer, type FixtureMode } from "../src/app/self-test-server.ts";
@@ -134,13 +134,16 @@ async function verify(
       for (const t of r.timings) console.log(`  time: ${t.name}: ${String(t.ms)} ms`);
       // CI artifacts can be hard to reach, so a failure carries its last API calls in the log.
       if (!r.ok) {
-        for (const e of [...r.consoleErrors, ...r.failedRequests]) console.log(`  ! ${e}`);
+        for (const e of [...r.consoleErrors, ...r.serverErrors, ...r.failedRequests])
+          console.log(`  ! ${e}`);
         for (const q of r.requests.filter((q) => q.path.startsWith("/api/")).slice(-15)) {
           console.log(`  ${q.method} ${q.path} ${String(q.status)}`);
         }
       }
     }
     for (const f of failures) console.log(`FAIL ${f}`);
+    // A 5xx's stack is only in wrangler.log, inside an artifact CI may not let you reach.
+    if (!ok) for (const line of workerErrors(log)) console.log(`  wrangler: ${line}`);
     console.log(`artifacts: ${relative(process.cwd(), outDir) || "."}`);
     console.log(`summary: ${relative(process.cwd(), summary)}`);
     console.log(ok ? "verify-app: PASS" : "verify-app: FAIL");

@@ -52,3 +52,22 @@ export function accessGranted(
 export function logEvent(event: { readonly event: string }): void {
   console.log(JSON.stringify(event));
 }
+
+/** One line when the API Worker starts a request and one when it answers (#72). */
+export interface RequestLog {
+  readonly event: "request_start" | "request_end";
+  /** Also sent back as the `x-inkly-request-id` response header. */
+  readonly requestId: string;
+  readonly method: string;
+  /** Path only, with secrets replaced: see {@link loggablePath}. */
+  readonly path: string;
+  readonly status?: number;
+  readonly ms?: number;
+}
+
+/** A request path safe to log: no query string, and Share-link tokens replaced. */
+export function loggablePath(path: string): string {
+  return path
+    .replace(/^\/api\/share\/[^/]+/, "/api/share/:token")
+    .replace(/^\/s\/[^/]+/, "/s/:token");
+}
