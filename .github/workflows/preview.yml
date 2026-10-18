@@ -72,6 +72,18 @@ jobs:
             n="$(grep -c "^$kind " "$RUNNER_TEMP/resources" || true)"
             [ "$n" = "1" ] || { echo "expected one $kind, found $n"; exit 1; }
           done
+      # #72: the Worker's own logs for the run. Each API request logs request_start and
+      # request_end (workers/api/src/request-log.ts), so one that never answered shows a
+      # start with no end; the tail event's `outcome` says how its invocation ended.
+      - name: start wrangler tail
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/artifacts"
+          nohup pnpm --filter @inkly/api exec wrangler tail "inkly-pr-$PR" --format json \
+            > "$GITHUB_WORKSPACE/artifacts/tail.jsonl" 2> "$GITHUB_WORKSPACE/artifacts/tail.stderr" &
+          echo $! > "$RUNNER_TEMP/tail.pid"
+          # Tail needs a few seconds to attach before the first journey's requests.
+          sleep 10
       - name: verify preview
         if: steps.secrets.outputs.ready == 'true'
         env:
@@ -93,12 +105,26 @@ jobs:
           TEST_HOOKS_SECRET="$(cat "$RUNNER_TEMP/preview-secret")"
           export TEST_HOOKS_SECRET
           .claude/skills/verify-perf/run.sh --url "$URL"
+      - name: stop wrangler tail
+        if: always() && steps.secrets.outputs.ready == 'true'
+        run: |
+          # The tail runs under pnpm: stop the whole process group, then let it flush.
+          if [ -f "$RUNNER_TEMP/tail.pid" ]; then
+            pkill -TERM -P "$(cat "$RUNNER_TEMP/tail.pid")" || true
+            kill "$(cat "$RUNNER_TEMP/tail.pid")" 2>/dev/null || true
+            sleep 2
+          fi
+          wc -c artifacts/tail.jsonl || true
+          node scripts/tail-summary.mjs artifacts/tail.jsonl || true
       - name: upload verify-app artifacts
         if: always() && steps.secrets.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: preview-verify-app
-          path: artifacts/verify-app/
+          path: |
+            artifacts/verify-app/
+            artifacts/tail.jsonl
+            artifacts/tail.stderr
           if-no-files-found: ignore
       - name: comment preview URL
         if: steps.secrets.outputs.ready == 'true'
