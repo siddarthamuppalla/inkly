@@ -12,6 +12,7 @@ import {
   reorder,
   rotate,
   split,
+  withAnnotations,
 } from "../../src/index.ts";
 
 async function pdf(pages: number): Promise<Uint8Array> {
@@ -45,6 +46,23 @@ describe("page ops inside the Workers runtime", () => {
     expect((await readFormFields(filled)).map((f) => [f.name, f.value])).toEqual([["name", "Ada"]]);
     const flat = await fillForm(filled, {}, { flatten: true });
     expect(await readFormFields(flat)).toEqual([]);
+  });
+
+  it("adds annotations to bytes", async () => {
+    const out = await withAnnotations(await pdf(1), [
+      {
+        id: "a1",
+        shape: { kind: "note", page: 1, color: "yellow", at: { x: 0.5, y: 0.5 }, text: "Hi" },
+        version: 1,
+        author: { id: "u1", name: "Ada" },
+        createdAt: 0,
+        updatedAt: 0,
+        resolvedAt: null,
+        comments: [],
+      },
+    ]);
+    const doc = await PDFDocument.load(out);
+    expect(doc.getPage(0).node.Annots()?.size()).toBe(1);
   });
 
   it("throws AppError for non-PDF bytes", async () => {

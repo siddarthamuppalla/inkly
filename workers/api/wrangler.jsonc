@@ -54,8 +54,17 @@
       "max_instances": 2,
     },
   ],
-  "durable_objects": { "bindings": [{ "name": "PDF_ENGINE", "class_name": "PdfEngine" }] },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PdfEngine"] }],
+  // T2.2: DocSession, one per Document, SQLite-backed. Only this Worker binds it.
+  "durable_objects": {
+    "bindings": [
+      { "name": "PDF_ENGINE", "class_name": "PdfEngine" },
+      { "name": "DOC_SESSIONS", "class_name": "DocSession" },
+    ],
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["PdfEngine"] },
+    { "tag": "v2-doc-session", "new_sqlite_classes": ["DocSession"] },
+  ],
   // Local dev and verify-app call a local pdf-engine process instead (workers/jobs/src/env.ts).
   "dev": { "enable_containers": false },
 }

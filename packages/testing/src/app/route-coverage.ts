@@ -13,7 +13,7 @@ export interface SeenRequest {
 
 export interface RouteCoverage {
   readonly route: ApiRoute;
-  /** Successful (2xx or 3xx) requests that matched the route. */
+  /** Successful (2xx, 3xx, or a 101 WebSocket upgrade) requests that matched the route. */
   readonly hits: number;
   /** Journeys that made at least one of those requests. */
   readonly journeys: readonly string[];
@@ -46,7 +46,8 @@ export function routeCoverage(
   const hits = new Map(routes.map((r) => [r, { hits: 0, journeys: new Set<string>() }]));
   for (const [journey, requests] of seen) {
     for (const req of requests) {
-      if (req.status < 200 || req.status >= 400) continue;
+      const upgraded = req.status === 101;
+      if (!upgraded && (req.status < 200 || req.status >= 400)) continue;
       const match = compiled.find(
         ({ route, re }) => route.method === req.method && re.test(req.path),
       );

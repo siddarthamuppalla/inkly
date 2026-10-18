@@ -43,7 +43,12 @@ async function share(who: { token: string }, documentId: string, extra = {}) {
 }
 
 function appAs(who: { tenantId: TenantId; userId: string }, role: Role) {
-  const session = { tenantId: who.tenantId, userId: who.userId as UserId, role };
+  const session = {
+    sessionId: "fixture-session",
+    tenantId: who.tenantId,
+    userId: who.userId as UserId,
+    role,
+  };
   const scoped = new Hono<{ Bindings: Env; Variables: TenantVars }>();
   scoped.onError(onAppError);
   scoped.use("*", async (c, next) => {

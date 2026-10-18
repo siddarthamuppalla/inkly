@@ -1,0 +1,13 @@
+at	kind	evidence
+2026-10-17	SCOPE	Audited current PR51 head63de24a on t/41-annotations-finish against current Phase2 ticket41; no Phase3 work.
+2026-10-17	FINDING	DocSession attached only Author and never revalidated persistent receivers; annotation target ignored Document.deletedAt.
+2026-10-17	RED	Original API suite: 117 passed,5 failed. Signout/expiry/trash sockets received forbidden annotation payload; trashed HTTP responses were200,201,200,101. Membership fixture initially expected200 instead of actual204; corrected before GREEN.
+2026-10-17	FIX	Layer1 auth/storage paved roads recheck nonsecret scoped session identity before outbound frames; exact membership plus nontrashed Document; HTTP trash404. No stored bearer/cookie and no auth bypass.
+2026-10-17	RED	Legacy hibernation attachment regression failed with D1_TYPE_ERROR binding undefined; added fail-closed attachment validation rather than allowing old sockets to disrupt writes.
+2026-10-17	GEOMETRY	11 PDF annotation tests passed, including added offset CropBox matrix0/90/180/270 for highlight/note/ink. Existing renderer unchanged; initial strict floating-point comparison corrected to toBeCloseTo.
+2026-10-17	BROWSER	verify-app J-010 PASS; artifacts/verify-app/2026-10-17T16-49-40-560Z-c805/summary.md; real two-context changes/presence plus annotated download verify-pdf and no new Version.
+2026-10-17	CI	Preview workflow installs qpdf and poppler-utils before deploy so J010 annotated download can run verify-pdf; all existing gates retained.
+2026-10-17	GREEN	26 annotation integration tests passed after production fixes; membership204 removal, signout, expiry, trash and legacy attachment channels close without annotation disclosure; scoped identity refuses a different DocSession and attachments retain no bearer.
+2026-10-17	CHECK	pnpm check PASS (tsc/eslint/prettier); verify-tenancy PASS with45 logged denial attempts, including cross-tenant live upgrade and annotations.
+2026-10-17	INTEGRATION	Annotation download access-log assertion filters read-content action so concurrent Phase2 activity edit logs do not masquerade as downloads.
+2026-10-17	COMMANDS	pnpm --filter @inkly/api exec vitest run test/annotations.test.ts26 passed; pnpm --filter @inkly/pdf exec vitest run test/annotate.test.ts11 passed; pnpm check PASS; .claude/skills/verify-tenancy/run.sh PASS; .claude/skills/verify-app/run.sh J-010 PASS.

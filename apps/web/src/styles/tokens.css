@@ -34,6 +34,12 @@
   --rule: #d9a39c;
   --shadow-color: #1b233359;
 
+  /* Annotation colors sit on the white PDF page in both themes; packages/pdf writes the same RGB. */
+  --annot-yellow: #ffd84d;
+  --annot-green: #7ed67e;
+  --annot-blue: #7fb0ff;
+  --annot-red: #ff8a80;
+
   --radius: 0.375rem;
   --fold: 1.25rem;
   --duration-fast: 150ms;

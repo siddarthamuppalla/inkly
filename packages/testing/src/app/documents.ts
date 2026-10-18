@@ -120,7 +120,7 @@ const J003: Journey = {
 
     const [download] = await Promise.all([
       page.waitForEvent("download", WAIT),
-      page.getByRole("button", { name: "Download" }).click(),
+      page.getByRole("button", { name: "Download", exact: true }).click(),
     ]);
     const saved = join(ctx.outDir, "J-003-download.pdf");
     await download.saveAs(saved);

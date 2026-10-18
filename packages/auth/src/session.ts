@@ -1,5 +1,10 @@
 import type { TenantId, UserId } from "@inkly/domain";
-import { findMembership, listMembershipsOfUser, type MembershipRow } from "@inkly/storage/auth";
+import {
+  findMembership,
+  findSessionExpiry,
+  listMembershipsOfUser,
+  type MembershipRow,
+} from "@inkly/storage/auth";
 
 import { getAuth } from "./better-auth.ts";
 import { testHooksOn, type AuthEnv } from "./env.ts";
@@ -13,12 +18,14 @@ export function isRole(value: unknown): value is Role {
 
 /** Who is calling and the Active tenant they act within, after the membership check. */
 export interface Session {
+  readonly sessionId: string;
   readonly tenantId: TenantId;
   readonly userId: UserId;
   readonly role: Role;
 }
 
 export interface SignedInUser {
+  readonly sessionId: string;
   readonly userId: UserId;
   readonly email: string;
   readonly name: string;
@@ -31,6 +38,7 @@ export async function currentUser(request: Request, env: AuthEnv): Promise<Signe
   const result = await getAuth(env, request.url).api.getSession({ headers: request.headers });
   if (!result) return null;
   return {
+    sessionId: result.session.id,
     userId: result.user.id as UserId,
     email: result.user.email,
     name: result.user.name,
@@ -57,6 +65,7 @@ export async function activeMembership(
 
 export function sessionOf(user: SignedInUser, membership: MembershipRow): Session {
   return {
+    sessionId: user.sessionId,
     userId: user.userId,
     tenantId: membership.tenantId as TenantId,
     role: isRole(membership.role) ? membership.role : "viewer",
@@ -90,4 +99,16 @@ export function resolveTenant(
     return { ok: true, tenantId: requested as TenantId };
   }
   return { ok: false };
+}
+
+/** Rechecks a live connection without retaining its authentication credential. */
+export async function liveSessionActive(
+  session: Pick<Session, "sessionId" | "userId" | "tenantId">,
+  env: AuthEnv,
+): Promise<boolean> {
+  const [expiresAt, membership] = await Promise.all([
+    findSessionExpiry(env, session.sessionId, session.userId),
+    findMembership(env, session.userId, session.tenantId),
+  ]);
+  return expiresAt !== null && new Date(expiresAt).getTime() > Date.now() && membership !== null;
 }

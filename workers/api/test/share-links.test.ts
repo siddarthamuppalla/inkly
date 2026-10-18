@@ -49,7 +49,12 @@ function grantCookie(res: Response): string {
 }
 
 function appAs(who: { tenantId: TenantId; userId: string }, role: Role) {
-  const session = { tenantId: who.tenantId, userId: who.userId as UserId, role };
+  const session = {
+    sessionId: "fixture-session",
+    tenantId: who.tenantId,
+    userId: who.userId as UserId,
+    role,
+  };
   const viewer = new Hono<{ Bindings: Env; Variables: TenantVars }>();
   viewer.onError(onAppError);
   viewer.use("*", async (c, next) => {

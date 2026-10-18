@@ -213,6 +213,7 @@ describe("a viewer Member", () => {
       tenantId: owner.tenantId,
       userId: owner.userId as UserId,
       role: "viewer" as const,
+      sessionId: "fixture-session",
     };
     const app = new Hono<{ Bindings: Env; Variables: TenantVars }>();
     app.onError(onAppError);

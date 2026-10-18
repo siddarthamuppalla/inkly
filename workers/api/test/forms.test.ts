@@ -135,7 +135,12 @@ describe("POST /api/documents/:id/form", () => {
 });
 
 function appAs(who: { tenantId: TenantId; userId: string }, role: Role) {
-  const session = { tenantId: who.tenantId, userId: who.userId as UserId, role };
+  const session = {
+    sessionId: "fixture-session",
+    tenantId: who.tenantId,
+    userId: who.userId as UserId,
+    role,
+  };
   const app = new Hono<{ Bindings: Env; Variables: TenantVars }>();
   app.onError(onAppError);
   app.use("*", async (c, next) => {

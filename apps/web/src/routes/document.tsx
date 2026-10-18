@@ -4,6 +4,9 @@ import { useState, type SyntheticEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { ActivityPanel } from "../components/activity-panel.tsx";
+import { AnnotationLayer } from "../components/annotations/annotation-layer.tsx";
+import { CommentsPanel } from "../components/annotations/comments-panel.tsx";
+import { AnnotationsProvider } from "../components/annotations/context.tsx";
 import { CompressPanel } from "../components/compress.tsx";
 import { FormPanel } from "../components/form-panel.tsx";
 import { Page } from "../components/page.tsx";
@@ -16,10 +19,11 @@ import { Field } from "../components/ui/field.tsx";
 import { Sheet, SheetBody, SheetHeader, SheetTitle } from "../components/ui/sheet.tsx";
 import { UploadButton, UploadStatus, useUpload } from "../components/upload.tsx";
 import { ApiError } from "../lib/api.ts";
+import { leaveForTrash } from "../lib/annotations-api.ts";
 import { documentsApi } from "../lib/documents-api.ts";
 import { folderChoices, folderPath } from "../lib/folders.ts";
 import { formatBytes, formatDateTime, formatPages } from "../lib/format.ts";
-import { keys, refreshAll, useFolders } from "../lib/queries.ts";
+import { keys, queryClient, refreshAll, useFolders } from "../lib/queries.ts";
 
 /** Saves fetched bytes, so a download carries the same credentials as every API call. */
 function saveFile(blob: Blob, filename: string) {
@@ -55,7 +59,11 @@ export function DocumentRoute() {
     );
   }
   if (!document.data) return <Page title="Document">{null}</Page>;
-  return <Viewer doc={document.data} />;
+  return (
+    <AnnotationsProvider doc={document.data}>
+      <Viewer doc={document.data} />
+    </AnnotationsProvider>
+  );
 }
 
 function Viewer({ doc }: { readonly doc: DocumentInfo }) {
@@ -80,6 +88,7 @@ function Viewer({ doc }: { readonly doc: DocumentInfo }) {
           <PageEdits key={doc.currentVersion} doc={doc} pdf={pdf} />
           <CompressPanel doc={doc} />
           <SharePanel doc={doc} />
+          <CommentsPanel />
           <Versions doc={doc} />
           <ActivityPanel doc={doc} />
         </aside>
@@ -124,14 +133,17 @@ function Viewer({ doc }: { readonly doc: DocumentInfo }) {
           {pdf &&
             pages.map((n) => (
               <figure key={n} id={`page-${String(n)}`} className="flex flex-col gap-2">
-                <PageCanvas
-                  pdf={pdf}
-                  pageNumber={n}
-                  width={800}
-                  label={`Page ${String(n)} of ${String(pages.length)}`}
-                  testId="page"
-                  className="h-auto w-full max-w-[800px] border bg-card shadow-sheet"
-                />
+                <div className="relative w-full max-w-[800px]">
+                  <PageCanvas
+                    pdf={pdf}
+                    pageNumber={n}
+                    width={800}
+                    label={`Page ${String(n)} of ${String(pages.length)}`}
+                    testId="page"
+                    className="block h-auto w-full border bg-card shadow-sheet"
+                  />
+                  <AnnotationLayer page={n} />
+                </div>
                 <figcaption className="text-sm text-muted-foreground">
                   Page {n} of {pages.length}
                 </figcaption>
@@ -147,11 +159,16 @@ function Actions({ doc }: { readonly doc: DocumentInfo }) {
   const navigate = useNavigate();
   const trashed = doc.deletedAt !== null;
   const trash = useMutation({
-    mutationFn: () =>
-      trashed ? documentsApi.restoreDocument(doc.id) : documentsApi.trashDocument(doc.id),
-    onSuccess: async () => {
+    mutationFn: (toTrash: boolean) =>
+      toTrash ? documentsApi.trashDocument(doc.id) : documentsApi.restoreDocument(doc.id),
+    onMutate: async (toTrash) => {
+      if (toTrash) await leaveForTrash(doc);
+    },
+    onError: refreshAll,
+    onSuccess: async (updated, toTrash) => {
+      queryClient.setQueryData(keys.document(doc.id), updated);
       await refreshAll();
-      if (!trashed) await navigate(doc.folderId ? `/?folder=${doc.folderId}` : "/");
+      if (toTrash) await navigate(doc.folderId ? `/?folder=${doc.folderId}` : "/");
     },
   });
   const { state, upload } = useUpload({ documentId: doc.id });
@@ -194,7 +211,7 @@ function Actions({ doc }: { readonly doc: DocumentInfo }) {
             variant={trashed ? "secondary" : "destructive"}
             loading={trash.isPending}
             onClick={() => {
-              trash.mutate();
+              trash.mutate(!trashed);
             }}
           >
             {trashed ? "Restore from Trash" : "Move to Trash"}

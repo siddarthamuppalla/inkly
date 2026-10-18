@@ -101,6 +101,14 @@ export async function runJourneys(
           requests.push({ method: r.request().method(), path: url.pathname, status: r.status() });
         }
       });
+      // A WebSocket fires no "response" event; one that receives a frame was upgraded (101).
+      page.on("websocket", (ws) => {
+        const url = new URL(ws.url().replace(/^ws/, "http"));
+        if (url.origin !== origin) return;
+        ws.once("framereceived", () => {
+          requests.push({ method: "GET", path: url.pathname, status: 101 });
+        });
+      });
       context.on("requestfailed", (r) => {
         failedRequests.push(`${r.url()}: ${r.failure()?.errorText ?? "failed"}`);
       });
