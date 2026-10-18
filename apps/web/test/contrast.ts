@@ -33,7 +33,6 @@ export const CONTRAST_PAIRS: readonly { fg: string; bg: string; min: number }[] 
 export const FIELD_TINT = 0.12;
 export const RECIPIENT_INKS = [1, 2, 3, 4, 5, 6].map((n) => `recipient-${String(n)}`);
 
-
 /** Splits tokens.css into the light `:root` block and the dark-scheme override. */
 export function parseThemes(css: string): { light: Tokens; dark: Tokens } {
   const darkAt = css.indexOf("@media (prefers-color-scheme: dark)");
