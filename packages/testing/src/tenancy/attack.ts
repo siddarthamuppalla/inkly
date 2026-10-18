@@ -133,6 +133,15 @@ async function newestMail(baseUrl: string, secret: string, to: string): Promise<
   return (body.messages ?? []).map((m) => m.text);
 }
 
+/** The signing link in the newest Outbox email to `to` that has one. */
+async function newestSignLink(baseUrl: string, secret: string, to: string): Promise<string> {
+  const token = (await newestMail(baseUrl, secret, to))
+    .map((text) => SIGN_LINK.exec(text)?.[1])
+    .find((t) => t !== undefined);
+  if (!token) throw new Error(`no signing link for ${to}`);
+  return token;
+}
+
 /**
  * T3.3 signer links: a token for A's Envelope reads only that Envelope, whatever else the
  * request names; its grant opens nothing else; it can't set B's Fields; voided and unknown
@@ -145,6 +154,7 @@ async function attackSignerLinks(
   b: Seeded,
   docA: Doc,
   sentB: Envelope,
+  tokenB: string,
   problems: string[],
 ): Promise<void> {
   const signerA = `tenancy-signer-${randomBytes(4).toString("hex")}@seed.inkly.test`;
@@ -169,19 +179,13 @@ async function attackSignerLinks(
       await call(baseUrl, a, "PUT", `/api/envelopes/${made.envelope.id}`, json(draft))
     ).arrayBuffer();
     await (await call(baseUrl, a, "POST", `/api/envelopes/${made.envelope.id}/send`)).arrayBuffer();
-    const token = SIGN_LINK.exec((await newestMail(baseUrl, secret, signerA))[0] ?? "")?.[1];
-    if (!token) throw new Error("no signing link for A's signer");
-    return { id: made.envelope.id, token };
+    return { id: made.envelope.id, token: await newestSignLink(baseUrl, secret, signerA) };
   };
   const live = await sendA();
   const voided = await sendA();
   await (
     await call(baseUrl, a, "POST", `/api/envelopes/${voided.id}/void`, json({ reason: "test" }))
   ).arrayBuffer();
-  const tokenB = SIGN_LINK.exec(
-    (await newestMail(baseUrl, secret, "b-signer@seed.inkly.test"))[0] ?? "",
-  )?.[1];
-  if (!tokenB) throw new Error("no signing link for B's signer");
   const bFields =
     (
       (await (await call(baseUrl, b, "GET", `/api/envelopes/${sentB.id}`)).json()) as {
@@ -215,7 +219,7 @@ async function attackSignerLinks(
   }
   const crossGrant = await sign(`${tokenB}/content`, { headers: { cookie } });
   await crossGrant.arrayBuffer();
-  if (crossGrant.status !== 401) {
+  if (crossGrant.status !== 401 && crossGrant.status !== 404) {
     problems.push(`A's signer grant opened B's link content (${String(crossGrant.status)})`);
   }
   for (const field of bFields) {
@@ -362,6 +366,9 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
   const sendB = await call(baseUrl, b, "POST", `/api/envelopes/${sentB.id}/send`);
   await sendB.arrayBuffer();
   if (sendB.status !== 200) throw new Error(`B's send returned ${String(sendB.status)}`);
+  // Read now: under the self-test's leaky build the attacks below can void or remind B's
+  // Envelope, which retires this link and mails B's signer an email without one.
+  const tokenB = await newestSignLink(baseUrl, secret, "b-signer@seed.inkly.test");
   const envelopeA = await envelopeOf(a, docA);
   const envelopesOfB = async () =>
     JSON.stringify(
@@ -845,7 +852,7 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     );
   }
   // After the access-log count above: signer requests log to the link's own Tenant (A).
-  await attackSignerLinks(baseUrl, secret, a, b, docA, sentB, problems);
+  await attackSignerLinks(baseUrl, secret, a, b, docA, sentB, tokenB, problems);
   if ((await envelopesOfB()) !== envelopesB) {
     problems.push("B's Envelopes or audit trails changed after the signer-link attacks");
   }
