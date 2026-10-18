@@ -14,6 +14,7 @@ import { slowDownD1 } from "./d1.ts";
 // local D1, so the first request is cancelled while its D1 work is in flight.
 
 const GET_SESSION = "/api/auth/get-session";
+const SEND_CODE = "/api/auth/email-otp/send-verification-otp";
 const SLOW_MS = 300;
 
 async function cancelledAfter(url: string, ms: number): Promise<void> {
@@ -74,5 +75,38 @@ describe("an auth request its client cancels (#72)", () => {
       }),
     ]);
     expect(statuses).toEqual([200, 401, 401, 401]);
+  }, 60_000);
+
+  it("does not hold Better-Auth's D1 queue for later requests when cancelled mid-query", async () => {
+    // Kysely runs SQLite dialects, D1's included, through one connection mutex per
+    // Better-Auth instance: each query takes the lock and releases it when it returns.
+    // Cancel a request while its query holds the lock and the release never runs, so
+    // every later auth query in the isolate waits for it (the hung OTP send on preview).
+    expect(await statusWithin(`http://warm-up-2.inkly.test${GET_SESSION}`, 20_000)).toBe(200);
+    restoreD1 = slowDownD1(SLOW_MS);
+    const origin = "http://cancelled-mid-query.inkly.test";
+    const send = (email: string, signal?: AbortSignal): RequestInit => ({
+      method: "POST",
+      headers: { "content-type": "application/json", origin },
+      body: JSON.stringify({ email, type: "sign-in" }),
+      ...(signal && { signal }),
+    });
+    // The send stores the code (one query), then looks the User up (a second): cancel it
+    // halfway through the second, while that query holds the lock.
+    const controller = new AbortController();
+    const first = exports.default
+      .fetch(`${origin}${SEND_CODE}`, send("first@example.com", controller.signal))
+      .catch(() => null);
+    await new Promise((resolve) => setTimeout(resolve, SLOW_MS * 1.5));
+    controller.abort();
+    await (await first)?.body?.cancel();
+    const budget = 20_000;
+    const statuses = await Promise.all([
+      statusWithin(`${origin}${SEND_CODE}`, budget, send("second@example.com")),
+      statusWithin(`${origin}/api/documents`, budget, {
+        headers: { authorization: "Bearer not-a-session" },
+      }),
+    ]);
+    expect(statuses).toEqual([200, 401]);
   }, 60_000);
 });

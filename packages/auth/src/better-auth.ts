@@ -1,6 +1,7 @@
 // Lets tsc name the zod types inside the Auth instance type in declarations (TS2883).
 import type {} from "zod/v4/core";
 import { AppError } from "@inkly/domain";
+import { step } from "@inkly/domain/log";
 import { authDatabase, listMembershipsOfUser } from "@inkly/storage/auth";
 import { betterAuth } from "better-auth";
 import { bearer, emailOTP, magicLink, organization } from "better-auth/plugins";
@@ -45,7 +46,9 @@ function options(env: AuthEnv, baseURL: string, deferred: Deferred) {
   const secret = env.BETTER_AUTH_SECRET;
   if (!secret) throw new AppError("internal", "BETTER_AUTH_SECRET is not set");
   const send = (to: string, subject: string, text: string) =>
-    reportingEmailFailure(() => emailSender(env).send({ to, subject, text }));
+    step("email_send", () =>
+      reportingEmailFailure(() => emailSender(env).send({ to, subject, text })),
+    );
   const google =
     env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
       ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }

@@ -71,3 +71,30 @@ export function loggablePath(path: string): string {
     .replace(/^\/api\/share\/[^/]+/, "/api/share/:token")
     .replace(/^\/s\/[^/]+/, "/s/:token");
 }
+
+/**
+ * Markers around one awaited step of a request (#72). In a `wrangler tail` event, a
+ * `step_start` with no matching `step_end` or `step_error` is where a hung request stopped.
+ */
+export interface StepLog {
+  readonly event: "step_start" | "step_end" | "step_error";
+  readonly step: string;
+  readonly ms?: number;
+}
+
+/** Runs `run`, logging a {@link StepLog} line before it and when it settles. */
+export async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
+  const started = Date.now();
+  const start: StepLog = { event: "step_start", step: name };
+  logEvent(start);
+  try {
+    const result = await run();
+    const end: StepLog = { event: "step_end", step: name, ms: Date.now() - started };
+    logEvent(end);
+    return result;
+  } catch (err) {
+    const failed: StepLog = { event: "step_error", step: name, ms: Date.now() - started };
+    logEvent(failed);
+    throw err;
+  }
+}

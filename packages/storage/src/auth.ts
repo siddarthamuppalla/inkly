@@ -1,12 +1,22 @@
+import { D1Dialect } from "./auth-dialect.ts";
 import type { StorageEnv } from "./env.ts";
+
+export { D1Dialect };
 
 // `@inkly/storage/auth`: the storage `packages/auth` needs before it has a TenantId:
 // Better-Auth's own tables, membership lookups by user, the Outbox and KV counters.
 // Lint (`no-restricted-imports`) keeps every other package out of this entry point.
 
-/** The D1 handle for Better-Auth's built-in D1 adapter, which owns the auth tables. */
-export function authDatabase(env: StorageEnv): D1Database {
-  return env.DB;
+/**
+ * Better-Auth's database: its Kysely adapter over D1, which owns the auth tables, through
+ * a dialect that does not queue every query behind one lock (see auth-dialect.ts, #72).
+ */
+export function authDatabase(env: StorageEnv): {
+  dialect: D1Dialect;
+  type: "sqlite";
+  transaction: false;
+} {
+  return { dialect: new D1Dialect(env.DB), type: "sqlite", transaction: false };
 }
 
 export interface MembershipRow {
