@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
-import { chromium, type LaunchOptions, type Page } from "playwright";
+import { chromium, type LaunchOptions, type Page, type Request as PwRequest } from "playwright";
 
 import type { Journey } from "./journeys.ts";
 import type { RouteCoverage, SeenRequest } from "./route-coverage.ts";
@@ -109,7 +109,16 @@ export async function runJourneys(
           requests.push({ method: "GET", path: url.pathname, status: 101 });
         });
       });
+      // Same-origin requests still waiting for a response (#72). One left at the end of a
+      // journey never answered; match it to the Worker's request_start line in
+      // `wrangler tail` by method, path and the time it was sent.
+      const pending = new Map<PwRequest, number>();
+      context.on("request", (r) => {
+        if (new URL(r.url()).origin === origin) pending.set(r, Date.now());
+      });
+      context.on("requestfinished", (r) => pending.delete(r));
       context.on("requestfailed", (r) => {
+        pending.delete(r);
         failedRequests.push(`${r.url()}: ${r.failure()?.errorText ?? "failed"}`);
       });
 
@@ -138,6 +147,12 @@ export async function runJourneys(
         failures.push(`threw: ${err instanceof Error ? err.message : String(err)}`);
       }
       const durationMs = Date.now() - started;
+      for (const [r, sentAt] of pending) {
+        const waited = Math.round((Date.now() - sentAt) / 1000);
+        failedRequests.push(
+          `${r.method()} ${r.url()}: no response after ${String(waited)} s (sent ${new Date(sentAt).toISOString()})`,
+        );
+      }
       const trace = `${journey.id}-trace.zip`;
       await context.tracing.stop({ path: join(outDir, trace) });
       artifacts.push(trace);
