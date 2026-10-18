@@ -15,6 +15,17 @@ const inkly = {
   },
 };
 
+const STORAGE_AUTH = {
+  name: "@inkly/storage/auth",
+  message:
+    "Only packages/auth may use @inkly/storage/auth (auth tables, Outbox, KV counters). Call a packages/auth function instead.",
+};
+const ENVELOPE_DO = "workers/api/src/envelope/do.ts";
+const STORAGE_ENVELOPES = {
+  name: "@inkly/storage/envelopes",
+  message: `Only the Envelope Durable Object (${ENVELOPE_DO}) writes Envelope rows. Call one of its methods through envelopeObject() instead.`,
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -81,24 +92,22 @@ export default tseslint.config(
       ],
       "inkly/no-direct-bindings": "error",
       "inkly/no-tenant-id-mint": "error",
-      "no-restricted-imports": [
-        "error",
-        {
-          paths: [
-            {
-              name: "@inkly/storage/auth",
-              message:
-                "Only packages/auth may use @inkly/storage/auth (auth tables, Outbox, KV counters). Call a packages/auth function instead.",
-            },
-          ],
-        },
-      ],
+      "no-restricted-imports": ["error", { paths: [STORAGE_AUTH, STORAGE_ENVELOPES] }],
     },
   },
   {
     // ADR-0004: packages/auth is where TenantIds are minted and auth storage is used.
     files: ["packages/auth/**/*.ts", "packages/storage/**/*.ts"],
     rules: { "inkly/no-tenant-id-mint": "off", "no-restricted-imports": "off" },
+  },
+  {
+    files: ["packages/auth/**/*.ts"],
+    rules: { "no-restricted-imports": ["error", { paths: [STORAGE_ENVELOPES] }] },
+  },
+  {
+    // ADR-0006: the Envelope Durable Object is the only writer of Envelope rows.
+    files: [ENVELOPE_DO],
+    rules: { "no-restricted-imports": ["error", { paths: [STORAGE_AUTH] }] },
   },
   {
     // Tests build fake TenantIds to exercise storage directly.

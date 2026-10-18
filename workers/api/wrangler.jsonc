@@ -59,11 +59,14 @@
     "bindings": [
       { "name": "PDF_ENGINE", "class_name": "PdfEngine" },
       { "name": "DOC_SESSIONS", "class_name": "DocSession" },
+      // T3.1: Envelope, one per Envelope, the single writer of its D1 rows (ADR-0006).
+      { "name": "ENVELOPES", "class_name": "Envelope" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["PdfEngine"] },
     { "tag": "v2-doc-session", "new_sqlite_classes": ["DocSession"] },
+    { "tag": "v3-envelope", "new_sqlite_classes": ["Envelope"] },
   ],
   // Local dev and verify-app call a local pdf-engine process instead (workers/jobs/src/env.ts).
   "dev": { "enable_containers": false },
