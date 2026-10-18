@@ -14,6 +14,13 @@ export {
   type CertificateRecipient,
   type CompletionCertificate,
 } from "./certificate.ts";
+export {
+  generateSealKey,
+  importSealKey,
+  sealPdf,
+  type GeneratedSealKey,
+  type SealKey,
+} from "./seal.ts";
 export { stampFields, type StampField, type StampFieldKind } from "./stamp.ts";
 export { MAX_SIGNATURE_BYTES } from "./text.ts";
 export { deletePages, merge, reorder, rotate, split } from "./ops.ts";
