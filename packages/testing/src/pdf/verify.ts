@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
 import { diffPngs } from "./pixeldiff.ts";
-import { pdfInfo, qpdfCheck, renderPages, type PdfInfo } from "./tools.ts";
+import { pdfInfo, pyhankoValidate, qpdfCheck, renderPages, type PdfInfo } from "./tools.ts";
 
 export interface Expectation {
   readonly valid: boolean;
@@ -27,6 +27,8 @@ export interface VerifyOptions {
   readonly updateGolden?: boolean;
   /** Maximum differing pixels per page, in percent. */
   readonly threshold?: number;
+  /** A PEM certificate: fail unless pyHanko finds every signature intact and trusted by it. */
+  readonly signed?: string;
 }
 
 export interface VerifyResult {
@@ -110,6 +112,11 @@ export function verifyFile(file: string, opts: VerifyOptions = {}): VerifyResult
   }
   if (opts.expectPages !== undefined && opts.expectPages !== info.pages) {
     failures.push(`expected ${String(opts.expectPages)} pages, found ${String(info.pages)}`);
+  }
+  if (opts.signed !== undefined) {
+    const sig = pyhankoValidate(file, opts.signed);
+    if (sig.ok) lines.push(...sig.signatures.map((s) => `signature ok: ${s}`));
+    else failures.push(`signature invalid: ${sig.detail}`);
   }
   if (opts.golden !== undefined) {
     const g = compareGolden(

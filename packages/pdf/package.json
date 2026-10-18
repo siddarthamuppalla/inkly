@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@inkly/domain": "workspace:*",
-    "pdf-lib": "1.17.1"
+    "asn1js": "3.0.10",
+    "pdf-lib": "1.17.1",
+    "pkijs": "3.4.1"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "1.4.3",
