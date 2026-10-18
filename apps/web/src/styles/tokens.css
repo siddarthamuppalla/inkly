@@ -42,7 +42,7 @@
 
   /*
    * Envelope fields also sit on the PDF page in both themes: each Recipient's ink on the
-   * field surface (tinted 12% with that ink), outlined in field-ink when focused.
+   * field surface tinted 12% with that ink (the -fill tokens; FIELD_TINT in test/contrast.ts), outlined in field-ink when focused.
    */
   --field-surface: #ffffff;
   --field-ink: #1b2333;
@@ -52,6 +52,12 @@
   --recipient-4: #0e6670;
   --recipient-5: #8a4b08;
   --recipient-6: #a3236d;
+  --recipient-1-fill: color-mix(in srgb, var(--recipient-1) 12%, var(--field-surface));
+  --recipient-2-fill: color-mix(in srgb, var(--recipient-2) 12%, var(--field-surface));
+  --recipient-3-fill: color-mix(in srgb, var(--recipient-3) 12%, var(--field-surface));
+  --recipient-4-fill: color-mix(in srgb, var(--recipient-4) 12%, var(--field-surface));
+  --recipient-5-fill: color-mix(in srgb, var(--recipient-5) 12%, var(--field-surface));
+  --recipient-6-fill: color-mix(in srgb, var(--recipient-6) 12%, var(--field-surface));
 
   --radius: 0.375rem;
   --fold: 1.25rem;

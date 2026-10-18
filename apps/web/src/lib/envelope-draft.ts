@@ -55,6 +55,11 @@ export function inkVar(index: number): string {
   return `var(--recipient-${String((index % INK_COUNT) + 1)})`;
 }
 
+/** The tinted surface under that Recipient's fields. */
+export function fillVar(index: number): string {
+  return `var(--recipient-${String((index % INK_COUNT) + 1)}-fill)`;
+}
+
 export function newId(prefix: "rcp" | "fld"): string {
   return `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
 }
