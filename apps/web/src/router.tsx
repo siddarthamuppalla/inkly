@@ -42,6 +42,13 @@ export const router = createBrowserRouter([
           },
           { path: "trash", Component: TrashRoute },
           { path: "envelopes", Component: EnvelopesRoute },
+          {
+            path: "envelopes/:id",
+            HydrateFallback: () => null,
+            lazy: async () => ({
+              Component: (await import("./routes/envelope.tsx")).EnvelopeRoute,
+            }),
+          },
           { path: "links", Component: LinksRoute },
           { path: "members", Component: MembersRoute },
           { path: "invitations/:id", Component: InvitationRoute },
