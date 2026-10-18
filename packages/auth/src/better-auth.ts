@@ -60,7 +60,12 @@ function options(env: AuthEnv, baseURL: string, deferred: Deferred) {
     // ADR-0003: Inkly owns sign-in rate limits, in KV (see handler.ts).
     rateLimit: { enabled: false },
     socialProviders: google,
-    advanced: { database: { generateId } },
+    // validateSchema: getAuth shares this instance across the isolate's requests, and
+    // Better-Auth's runtime schema check is one D1 promise every concurrent auth call
+    // awaits. On Cloudflare, a client disconnect cancels the request that started it,
+    // and every later auth call in that isolate then hangs (#72). Migrations own the
+    // schema (0004); the auth tests run against them.
+    advanced: { database: { generateId, validateSchema: false } },
     user: {
       modelName: "users",
       fields: { emailVerified: "email_verified", ...CREATED_UPDATED },
@@ -195,7 +200,11 @@ export type Auth = ReturnType<typeof createAuth>;
 
 const instances = new WeakMap<AuthEnv, Map<string, Auth>>();
 
-/** The Better-Auth instance for this env and public origin, built once per isolate. */
+/**
+ * The Better-Auth instance for this env and public origin, built once per isolate
+ * (building one costs a few ms of CPU). Concurrent requests share it, so it must not
+ * hold a pending promise or I/O object from the request that built it: see #72.
+ */
 export function getAuth(env: AuthEnv, requestUrl: string): Auth {
   const baseURL = env.BETTER_AUTH_URL ?? new URL(requestUrl).origin;
   let byOrigin = instances.get(env);
