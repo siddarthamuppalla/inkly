@@ -1,6 +1,7 @@
-import { AppError, type Annotation, type AnnotationColor, type Point } from "@inkly/domain";
+import { AppError, type Annotation, type AnnotationColor } from "@inkly/domain";
 import { PDFHexString, PDFString, type PDFDict, type PDFPage } from "pdf-lib";
 
+import { toUserSpace } from "./geometry.ts";
 import { load } from "./load.ts";
 
 /** RGB for each color; apps/web/src/styles/tokens.css holds the same values as --annot-*. */
@@ -15,24 +16,6 @@ const NOTE_ICON = 24;
 /** Print; for notes also NoZoom and NoRotate, so the icon stays upright at its anchor. */
 const PRINT = 4;
 const PRINT_FIXED_ICON = 4 | 8 | 16;
-
-const ROTATIONS = [0, 90, 180, 270] as const;
-
-/** Maps a page-relative point on the displayed (rotated) page to PDF user space. */
-function toUserSpace(page: PDFPage, p: Point): [number, number] {
-  const box = page.getCropBox();
-  const angle = ((page.getRotation().angle % 360) + 360) % 360;
-  const rotation = ROTATIONS.find((r) => r === angle) ?? 0;
-  const [s, t] = (
-    {
-      0: [p.x, p.y],
-      90: [p.y, 1 - p.x],
-      180: [1 - p.x, 1 - p.y],
-      270: [1 - p.y, p.x],
-    } as const satisfies Record<typeof rotation, readonly [number, number]>
-  )[rotation];
-  return [box.x + s * box.width, box.y + (1 - t) * box.height];
-}
 
 function bounds(points: readonly (readonly [number, number])[]): number[] {
   const xs = points.map((p) => p[0]);

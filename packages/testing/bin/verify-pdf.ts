@@ -3,7 +3,7 @@ import { parseArgs } from "node:util";
 import { DEFAULT_THRESHOLD, verifyCorpus, verifyFile, type VerifyOptions } from "../src/index.ts";
 
 const USAGE = `usage:
-  verify-pdf <file.pdf> [--expect-pages N] [--golden DIR [--threshold PCT] [--update-golden]]
+  verify-pdf <file.pdf> [--expect-pages N] [--signed CERT.pem] [--golden DIR [--threshold PCT] [--update-golden]]
   verify-pdf --corpus DIR`;
 
 function main(): number {
@@ -14,6 +14,7 @@ function main(): number {
       golden: { type: "string" },
       threshold: { type: "string" },
       "update-golden": { type: "boolean" },
+      signed: { type: "string" },
       corpus: { type: "string" },
       help: { type: "boolean", short: "h" },
     },
@@ -56,6 +57,7 @@ function main(): number {
     opts.expectPages = n;
   }
   if (values.golden !== undefined) opts.golden = values.golden;
+  if (values.signed !== undefined) opts.signed = values.signed;
   if (values["update-golden"] === true) opts.updateGolden = true;
   if (values.threshold !== undefined) {
     const t = Number(values.threshold);
