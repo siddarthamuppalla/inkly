@@ -206,9 +206,10 @@ export function DraftEditor({ detail }: { readonly detail: EnvelopeResponse }) {
       lede="Draft · add recipients, place their fields, then send."
     >
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        {/* Scrolls on its own beside the pages, so the palette is in reach of any page. */}
         <aside
           aria-label="Envelope settings"
-          className="flex flex-col gap-6 lg:col-start-2 lg:row-start-1"
+          className="flex flex-col gap-6 lg:sticky lg:top-4 lg:col-start-2 lg:row-start-1 lg:max-h-[calc(100dvh-2rem)] lg:self-start lg:overflow-y-auto lg:p-1"
         >
           <Sheet>
             <SheetHeader>
@@ -243,8 +244,6 @@ export function DraftEditor({ detail }: { readonly detail: EnvelopeResponse }) {
               )}
             </SheetBody>
           </Sheet>
-          <Settings draft={draft} onChange={change} />
-          <RecipientsPanel draft={draft} onChange={change} />
           <Palette
             owner={owner}
             signers={signers}
@@ -265,12 +264,15 @@ export function DraftEditor({ detail }: { readonly detail: EnvelopeResponse }) {
               }}
             />
           )}
+          <Settings draft={draft} onChange={change} />
+          <RecipientsPanel draft={draft} onChange={change} />
           <DeleteDraft
             onDelete={async () => {
               discard();
               await envelopesApi.remove(id);
               await navigate("/envelopes");
               queryClient.removeQueries({ queryKey: envelopeKeys.envelope(id) });
+              queryClient.removeQueries({ queryKey: envelopeKeys.content(id) });
               await refreshAll();
             }}
           />
