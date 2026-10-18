@@ -150,9 +150,9 @@ const J016: Journey = {
 
     const fields = page.getByTestId("envelope-field");
     await reach(ctx, fields.nth(3).waitFor(WAIT), "four placed fields are not on the pages");
-    const kinds = (await fields.evaluateAll((els) =>
-      els.map((el) => (el as unknown as { dataset: { kind: string } }).dataset.kind),
-    )) as string[];
+    const kinds = await Promise.all(
+      (await fields.all()).map(async (f) => (await f.getAttribute("data-kind")) ?? ""),
+    );
     expect(
       [...kinds].sort().join(",") === "date,initials,signature,text",
       `placed fields are ${kinds.join(",")}`,
