@@ -86,6 +86,8 @@ _Avoid_: public link
 
 **Certificate of completion**: PDF summary of an envelope's audit trail appended to the signed doc.
 
+**Envelope object**: The per-Envelope Durable Object (`Envelope`, named `{tenantId}/{envelopeId}`), the only writer of its Envelope, Recipient, Field and audit rows; it runs one mutation at a time so the hash chain has one writer.
+
 **Envelope status**: `draft`, `sent`, `completing`, `completed`, `declined`, `voided` or `expired` (ADR-0006). Only a draft can be edited or deleted.
 
 **Routing order**: A Recipient's position when an Envelope is sequential; order 2 is emailed once everyone at order 1 has signed. In parallel order every signer is emailed at send.

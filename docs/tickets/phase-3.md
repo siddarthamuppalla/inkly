@@ -39,15 +39,35 @@ Envelope (T3.2), J-017 sign as two signers (T3.3 + T3.5), J-018 decline and void
 Builders work in parallel against this; changing it means changing this file in the same PR.
 
 **Tables (0010):** `envelopes(tenant_id, id, document_id, version, title, message, status,
-order_mode, created_by, created_at, updated_at, sent_at, expires_at, completed_at,
-final_version)`, `recipients(tenant_id, envelope_id, id, email, name, role, routing_order,
-status, token_hash UNIQUE, notified_at, viewed_at, signed_at, declined_at, decline_reason,
-code_hash, code_expires_at, code_attempts, verified_ip, verified_user_agent)`,
-`fields(tenant_id, envelope_id, id, recipient_id, kind, page, x, y, w, h, required, value)`,
-`audit_events(tenant_id, subject_type, subject_id, seq, actor, action, detail, ip,
-user_agent, at, prev_hash, hash, PRIMARY KEY (tenant_id, subject_type, subject_id, seq))`
-with triggers aborting `UPDATE`/`DELETE` on `audit_events`. Field geometry is
-page-relative 0..1, origin top-left, like Annotations. Ids: `env_`, `rcp_`, `fld_`.
+order_mode, expires_in_days, created_by, created_at, updated_at, sent_at, expires_at,
+completed_at, final_version)`, `recipients(tenant_id, envelope_id, id, email, name, role,
+routing_order, status, token_hash UNIQUE, notified_at, viewed_at, signed_at, declined_at,
+decline_reason, code_hash, code_expires_at, code_attempts, verified_ip,
+verified_user_agent)`, `fields(tenant_id, envelope_id, id, recipient_id, kind, page, x, y,
+w, h, required, value)`, `audit_events(tenant_id, subject_type, subject_id, seq, actor,
+action, detail, ip, user_agent, at, prev_hash, hash, PRIMARY KEY (tenant_id, subject_type,
+subject_id, seq))` with triggers aborting `UPDATE`/`DELETE` on `audit_events`. Recipient and
+Field primary keys are `(tenant_id, envelope_id, id)`. `expires_in_days` (1–90, default 30)
+holds the draft's choice until send sets `expires_at`. Field geometry is page-relative
+0..1, origin top-left, like Annotations. Ids: `env_`, `rcp_`, `fld_`. `audit_events.actor` is
+a UserId (Member), a RecipientId (signer) or `system` (Workflow); `detail` is canonical JSON.
+
+**Writes (T3.1):** only `workers/api/src/envelope/do.ts` imports `@inkly/storage/envelopes`
+(`insertEnvelope`, `replaceDraft`, `deleteDraft`, `commitEnvelope` for any status, Recipient
+or Field change plus its audit events in one batch, `claimEnvelope`/`releaseEnvelope`).
+T3.3/T3.5 add DO methods that call `commitEnvelope`; reach the DO with
+`envelopeObject(env, tenantId, envelopeRow)`. DO methods return
+`{ ok: true, value } | { ok: false, code, message }` (an AppError code).
+
+**PUT draft body:** `{ title, message?, orderMode?, expiresInDays?, recipients: [{ id?, name,
+email, role, routingOrder? }], fields: [{ id?, recipientId, kind, page, rect: {x, y, w, h},
+required? }] }`. A field names its Recipient by id, so a client that adds fields sends
+Recipient ids (`rcp_…`, kept across saves); missing ids are minted. Responses are
+`{ envelope, recipients, fields }`. Audit events carry every hashed field (`tenantId`,
+`subjectType`, `subjectId`, …, `prevHash`, `hash`) so clients can rerun `verifyChain`.
+
+**Remind:** only token hashes are stored, so a reminder mints a fresh link per pending
+signer and the previous link stops working.
 
 **Statuses:** Envelope `draft | sent | completing | completed | declined | voided |
 expired`; Recipient `waiting | sent | viewed | signed | declined` (CCs stay `waiting`

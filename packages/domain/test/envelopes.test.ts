@@ -82,7 +82,12 @@ describe("EnvelopeDraft", () => {
     title: "Lease",
     recipients: [{ id: "rcp_ana", name: "Ana Ruiz", email: " Ana@Example.test ", role: "signer" }],
     fields: [
-      { recipientId: "rcp_ana", kind: "signature", page: 1, rect: { x: 0.1, y: 0.8, w: 0.3, h: 0.05 } },
+      {
+        recipientId: "rcp_ana",
+        kind: "signature",
+        page: 1,
+        rect: { x: 0.1, y: 0.8, w: 0.3, h: 0.05 },
+      },
     ],
   };
 

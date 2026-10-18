@@ -21,12 +21,7 @@ export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export type AuditSubjectType = "envelope";
 
 export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | readonly JsonValue[]
-  | { readonly [key: string]: JsonValue };
+  string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 
 /** What one audit event commits to; `hash` covers exactly these fields. */
 export interface AuditEventBody {

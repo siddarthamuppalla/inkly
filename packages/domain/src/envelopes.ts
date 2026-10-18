@@ -63,7 +63,9 @@ export type FieldKind = z.infer<typeof FieldKind>;
 export const ENVELOPE_EXPIRY_DAYS = { default: 30, min: 1, max: 90 } as const;
 
 const Id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
-const RecipientIdText = z.string().regex(/^rcp_[A-Za-z0-9]{1,60}$/, "Recipient ids start with rcp_");
+const RecipientIdText = z
+  .string()
+  .regex(/^rcp_[A-Za-z0-9]{1,60}$/, "Recipient ids start with rcp_");
 const FieldIdText = z.string().regex(/^fld_[A-Za-z0-9]{1,60}$/, "Field ids start with fld_");
 
 export const EnvelopeCreate = z.object({ documentId: Id });
