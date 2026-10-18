@@ -1,17 +1,23 @@
 import { AppError } from "@inkly/domain";
 import { PDFDocument } from "pdf-lib";
+import * as pkijs from "pkijs";
 import { describe, expect, it } from "vitest";
 
 import {
+  appendCertificate,
   deletePages,
   fillForm,
+  generateSealKey,
+  importSealKey,
   inspect,
   merge,
   pageNumber,
   readFormFields,
   reorder,
   rotate,
+  sealPdf,
   split,
+  stampFields,
   withAnnotations,
 } from "../../src/index.ts";
 
@@ -63,6 +69,45 @@ describe("page ops inside the Workers runtime", () => {
     ]);
     const doc = await PDFDocument.load(out);
     expect(doc.getPage(0).node.Annots()?.size()).toBe(1);
+  });
+
+  it("stamps, certifies and seals with WebCrypto", async () => {
+    const key = await generateSealKey();
+    const stamped = await stampFields(await pdf(1), [
+      { kind: "text", page: 1, x: 0.1, y: 0.1, w: 0.8, h: 0.2, value: "Ada" },
+      { kind: "checkbox", page: 1, x: 0.1, y: 0.5, w: 0.1, h: 0.2, value: "true" },
+    ]);
+    const certified = await appendCertificate(stamped, {
+      envelopeId: "env_1",
+      title: "NDA",
+      documentSha256: "0".repeat(64),
+      sentAt: 0,
+      completedAt: 60_000,
+      sender: { name: "Ada", email: "ada@example.com" },
+      recipients: [],
+      events: [{ seq: 1, at: 0, actor: "Ada", action: "created", hash: "a".repeat(64) }],
+    });
+    const imported = await importSealKey(key.privateKeyPem, key.certificatePem);
+    const sealed = await sealPdf(certified, imported);
+    expect((await inspect(sealed)).pages).toBe(2);
+
+    const text = new TextDecoder("latin1").decode(sealed);
+    const range = /\/ByteRange \[0 (\d+) (\d+) (\d+) *\]/.exec(text)?.slice(1).map(Number);
+    const [start = 0, resume = 0, rest = 0] = range ?? [];
+    expect(resume + rest).toBe(sealed.length);
+    const signed = new Uint8Array(start + rest);
+    signed.set(sealed.subarray(0, start));
+    signed.set(sealed.subarray(resume), start);
+    const hex = text.slice(start + 1, resume - 1);
+    const der = Uint8Array.from(hex.match(/../g) ?? [], (h) => parseInt(h, 16));
+    const cms = new pkijs.SignedData({
+      schema: pkijs.ContentInfo.fromBER(der.buffer).content,
+    });
+    expect(await cms.verify({ signer: 0, data: signed.buffer, checkChain: false })).toBe(true);
+    signed[10] = (signed[10] ?? 0) ^ 1;
+    await expect(
+      cms.verify({ signer: 0, data: signed.buffer, checkChain: false }),
+    ).rejects.toThrow();
   });
 
   it("throws AppError for non-PDF bytes", async () => {
