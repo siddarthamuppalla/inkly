@@ -89,13 +89,13 @@ export function signingDate(at: number): string {
 }
 
 const PNG_PREFIX = "data:image/png;base64,";
-/** The PNG signature (89 50 4E 47 0D 0A 1A 0A) is always the first 11 base64 characters. */
-const PNG_MAGIC_B64 = "iVBORw0KGgo";
+/** The PNG signature (89 50 4E 47 0D 0A 1A 0A) in base64; the 11th character also carries the next byte's top two bits. */
+const PNG_MAGIC_B64 = /^iVBORw0KGg[o-r]/;
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
 function pngProblem(value: string, what: string): string | null {
   const b64 = value.startsWith(PNG_PREFIX) ? value.slice(PNG_PREFIX.length) : "";
-  if (!BASE64.test(b64) || b64.length % 4 !== 0 || !b64.startsWith(PNG_MAGIC_B64)) {
+  if (!BASE64.test(b64) || b64.length % 4 !== 0 || !PNG_MAGIC_B64.test(b64)) {
     return `The ${what} must be a PNG image`;
   }
   const padding = b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0;

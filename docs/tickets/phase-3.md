@@ -110,6 +110,27 @@ access-logged in the owning Tenant): `GET /api/sign/:token` · `POST /api/sign/:
 `POST /api/sign/:token/sign {values, consent: true}` · `POST /api/sign/:token/decline {reason}`.
 `GET /api/seal-certificate` is public.
 
+**Signer API as built (T3.3):** `GET /:token` returns `SignerEnvelope` (packages/domain
+`signing.ts`): `{ status: "pending", title, message, sender: {name, email}, recipient:
+{name}, verified, pages, fields }`, where `fields` (this signer's only) and `pages` are
+filled in only while the browser holds the grant; or the done state `{ status: "signed",
+title, role, signedAvailable }` for a signer who signed or any Recipient's completion link
+(`signedAvailable` while `signedPdf` would serve). `code` and `verify` answer 204; `sign`
+and `decline` answer `{ status }`. The grant is the `inkly_sign` cookie (HMAC under
+`BETTER_AUTH_SECRET`, 1 hour, path `/api/sign/{token}`, bound to the Recipient and the
+link's hash, so a reminder's fresh link needs a fresh code). Decline needs the grant too, so
+a forwarded link alone cannot close an Envelope. Content on a completion link needs no code.
+Access-log entries use `actorUserId` = the RecipientId, `documentId`, IP and user agent, with
+actions `read` (open), `unlock` (code, verify), `read-content`, `download` (signed PDF) and
+`write` (sign, decline). A link packages/auth cannot attribute (unknown, or replaced by a
+reminder or completion) is the same 404 but logged nowhere. Codes are stored as
+HMAC-SHA256 of `recipientId|code`; a right code is used up. Date Fields take the server's
+UTC date `YYYY-MM-DD`; the `signed` event records text, date and checkbox values as typed,
+signature and initials images as `{ sha256 }`, plus `consent` (the exact `CONSENT_TEXT`).
+"Next field" walks required, unfilled Fields only. The sign mutation calls the private
+`beginCompletion(ref, envelope, origin)` (not `markAllSigned`, since it is already inside a
+mutation); decline calls `stopLifecycle(ref)`.
+
 **Web routes:** `/envelopes` (list), `/envelopes/:id` (draft editor or status page),
 `/sign/:token` (signer page, no app shell, like `/s/:token`).
 

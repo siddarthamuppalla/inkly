@@ -98,6 +98,9 @@ _Avoid_: share link (that is for Members' Documents)
 **Signing code**: The 6-digit, 10-minute code emailed to a Recipient to prove control of their inbox before they view or sign.
 _Avoid_: OTP (in UI copy), Sign-in code (that is for Users)
 
+**Signer grant**: The signed, 1-hour cookie a right Signing code sets for one Signer link; it lets that browser view the document, sign or decline.
+_Avoid_: signer session (signers have no session)
+
 **Finalize**: Stamping Field values, appending the Certificate of completion and applying the Document seal, producing the Envelope's sealed Version.
 
 **Envelope lifecycle**: The `EnvelopeLifecycle` Workflow instance of one sent Envelope: it reminds pending signers every 3 days, expires the Envelope at `expires_at` and runs Finalize until it succeeds. It only calls Envelope DO methods.
