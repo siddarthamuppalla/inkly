@@ -21,7 +21,7 @@ these hold:
 | Size | At most 2000 changed lines, and the full file list was readable. |
 | Protected paths | No change to `.github/`, `scripts/`, `CLAUDE.md`, `docs/ops/`, `.claude/` (except `verify-app/feature-map.md`), the verify harness in `packages/testing/` (journey files excepted), `packages/auth/`, `packages/storage/`, D1 migrations, `wrangler.json(c)`, `package.json`, the lockfile, `pnpm-workspace.yaml` or `.nvmrc`. |
 | Journeys | No journey ID removed from `feature-map.md`. |
-| Checks | `check`, `test`, `verify-pdf`, `verify-perf`, `verify-app`, `verify-tenancy`, `audit`, `prod-config`, `secrets`, `workflows`, `verdict` and `preview` all ran and passed on the head commit (none skipped), and no other check failed. |
+| Checks | `check`, `test`, `verify-pdf`, `verify-perf`, `verify-app`, `verify-tenancy`, `verify-signing`, `audit`, `prod-config`, `secrets`, `workflows`, `verdict` and `preview` all ran and passed on the head commit (none skipped), and no other check failed. |
 | Branch | Up to date with `main` and free of conflicts. |
 
 The script posts one comment (marker `<!-- inkly-auto-merge -->`, edited in place)

@@ -18,11 +18,12 @@ All are jobs in `.github/workflows/ci.yml`, except `preview` (`preview.yml`):
 | `verify-perf` | `verify-perf` (p95 ≤ 3 s, ≤ 20% regression vs `perf-baseline.json`) and `--self-test`. **Not yet in the required list below: a human adds it** once it has run green on a runner. |
 | `verify-app` | `verify-app --self-test` and `verify-app --all`: every journey in `feature-map.md`, and a failure for any API route no journey reached with a 2xx |
 | `verify-tenancy` | `verify-tenancy` and `--self-test` |
+| `verify-signing` | `verify-signing` and `--self-test`: a two-signer Envelope to completion; the sealed PDF passes qpdf and pyHanko against `/api/seal-certificate`, has the original pages plus the certificate, holds the stamped text, and its audit chain and `completed` sha256 match |
 | `audit` | `pnpm audit --audit-level high` |
 | `prod-config` | production `wrangler.jsonc` has no `TEST_HOOKS` (Q11) |
 | `secrets` | gitleaks |
 | `workflows` | `node --test scripts/auto-merge.test.mjs` (auto-merge guardrails) and `actionlint` with shellcheck |
-| `preview` | deploys `inkly-pr-<n>` to Cloudflare, then `verify-app --all` and `verify-tenancy` against it. Fails when the Cloudflare secrets are missing; fork PRs skip it. |
+| `preview` | deploys `inkly-pr-<n>` to Cloudflare, then `verify-app --all`, `verify-tenancy` and `verify-signing` against it. Fails when the Cloudflare secrets are missing; fork PRs skip it. |
 
 `verdict` (T1.7) is not required: it
 only restates the jobs above as one PASS/FAIL comment on the PR, and it skips on
@@ -38,7 +39,7 @@ gh api -X PUT repos/siddarthamuppalla/inkly/branches/main/protection \
 {
   "required_status_checks": {
     "strict": true,
-    "contexts": ["check", "test", "verify-pdf", "verify-app", "verify-tenancy", "audit", "prod-config", "secrets", "workflows", "preview"]
+    "contexts": ["check", "test", "verify-pdf", "verify-app", "verify-tenancy", "verify-signing", "audit", "prod-config", "secrets", "workflows", "preview"]
   },
   "enforce_admins": true,
   "required_pull_request_reviews": { "required_approving_review_count": 0 },
@@ -51,7 +52,7 @@ JSON
 ```
 
 Or use the web UI: Settings, Branches, then add a rule for `main`. Turn on "Require
-status checks to pass" and add the ten checks above. Turn on "Require a pull
+status checks to pass" and add the eleven checks above. Turn on "Require a pull
 request before merging" and leave "Allow force pushes" off.
 
 ## Check it

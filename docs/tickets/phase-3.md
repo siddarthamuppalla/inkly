@@ -32,7 +32,7 @@ T3.4 sealed output ──┴─ T3.5 completion ──────────�
 ```
 Reserved: migration `0010_envelopes.sql` (T3.1); DO migration tag `v3-envelope` (T3.1);
 Workflow `EnvelopeLifecycle` binding `ENVELOPE_LIFECYCLE` (T3.5); journeys J-016 send an
-Envelope (T3.2), J-017 sign as two signers (T3.3 + T3.5), J-018 decline and void (T3.3).
+Envelope (T3.2), J-017 sign as two signers (built in T3.6), J-018 decline and void (T3.3).
 
 ## Shared contract
 
@@ -222,6 +222,34 @@ mutation); decline calls `stopLifecycle(ref)`.
 - [ ] `--self-test` proves it fails on a tampered byte, a broken chain and a missing certificate.
 - [ ] A `verify-signing` CI job runs it, `preview.yml` runs it against the preview, and `docs/ops/branch-protection.md` lists it.
 - [ ] `verify-app J-017` (sender sends to two signers in sequence, both sign in separate browser contexts, sender downloads) passes; the success criterion "upload → 2 signers → signed PDF + certificate" is timed in the run output.
+
+**As built (T3.6):** `packages/testing/src/signing/drive.ts` runs the Envelope (10p.pdf;
+Ana signs signature, text and date on page 1, then Ben initials, signature and text on
+page 2, sequential) and `check.ts` judges what it downloaded with six named checks: `qpdf`,
+`seal`, `pages`, `stamped-text`, `audit-chain`, `completed-sha256`. The original page count
+is that of the pinned Version from `GET /api/envelopes/:id/content` before sending. The
+certificate pages are the trailing pages whose text starts "Certificate of completion" (every
+page `appendCertificate` writes does), at least one. The stamped text is each typed text value
+plus the date recorded in the `signed` events, found in the original pages' `pdftotext` output.
+`audit-chain` requires `verifyChain` valid, its head equal to `chain.head`, and `chain.valid`.
+The driver also requires that signer 2 gets no link until signer 1 signs, and that a completion
+link serves the same bytes as the sender's content route. verify-app's `JourneyContext` gained
+`time(name, ms)`; J-017 records its timing that way, and the CLI and `summary.md` print it.
+J-017 runs the same checks on the PDF the sender downloads.
+
+Deviations from the ticket and contract:
+- **"Missing certificate"** in `--self-test` covers two cases: the Certificate of completion
+  pages removed (must fail `pages`) and no seal certificate (must fail `seal`). A tampered byte
+  must fail `seal` and `completed-sha256`, and a changed `signed` event must fail `audit-chain`.
+  The unchanged result must pass first, or the self-test fails.
+- **J-017** was reserved for "T3.3 + T3.5" and is built here. Its feature-map row says T3.6.
+- **J-016**: this branch merges T3.2 (#74), so J-016 is T3.2's editor journey. T3.1's API
+  steps go, as its row said they would. T3.5's public `/api/seal-certificate` check stays in it.
+- `verify-signing` is also a required check in `scripts/auto-merge.mjs` and
+  `docs/ops/auto-merge.md`, a guarded path, so a human reviews that change. A human must apply
+  the new required-check list in `docs/ops/branch-protection.md`, since agents never change
+  repository settings.
+- `preview.yml` now installs pyHanko, which verify-signing and J-017 need.
 
 **Verification:** the skill itself, in CI and on a preview.
 **Risk:** medium.

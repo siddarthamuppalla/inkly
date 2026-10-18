@@ -63,6 +63,21 @@ jobs:
       - uses: ./.github/actions/setup
       - run: .claude/skills/verify-tenancy/run.sh
       - run: .claude/skills/verify-tenancy/run.sh --self-test
+  verify-signing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        # qpdf, pdftotext and pyHanko check the sealed PDF; the local pdf-engine needs gs.
+        with: { pdf-tools: "true" }
+      - run: .claude/skills/verify-signing/run.sh
+      - run: .claude/skills/verify-signing/run.sh --self-test
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-signing
+          path: artifacts/verify-signing/
+          if-no-files-found: ignore
   audit:
     runs-on: ubuntu-latest
     steps:
@@ -111,6 +126,7 @@ jobs:
         verify-perf,
         verify-app,
         verify-tenancy,
+        verify-signing,
         audit,
         prod-config,
         secrets,
