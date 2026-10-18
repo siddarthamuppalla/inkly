@@ -2,8 +2,8 @@
 # cf-deploy-preview: per-PR preview environments on Cloudflare (Q9). See SKILL.md.
 #
 #   run.sh <pr>                 create or reuse inkly-pr-<pr> resources, migrate, deploy, print URL
-#   run.sh --teardown <pr>      delete the Worker, D1, R2 bucket, KV namespace, Job queue and
-#                               pdf-engine Container application for <pr>
+#   run.sh --teardown <pr>      delete the Worker, D1, R2 bucket, KV namespace, Job queue,
+#                               EnvelopeLifecycle Workflow and pdf-engine Container for <pr>
 #   run.sh --sweep              tear down every inkly-pr-* whose PR is closed (needs gh + GH_TOKEN)
 #   run.sh --list <pr>          print the inkly-pr-<pr> resources that exist, one per line
 #
@@ -66,6 +66,10 @@ teardown() {
   if [ -n "$id" ]; then cf DELETE "$acct/storage/kv/namespaces/$id" >/dev/null && echo "kv: deleted $name"; fi
   id="$(queue_id "$name-jobs")"
   if [ -n "$id" ]; then cf DELETE "$acct/queues/$id" >/dev/null && echo "queue: deleted $name-jobs"; fi
+  # Deleting the Worker leaves its Workflow (and instance history) behind.
+  if cf GET "$acct/workflows/$name-envelope-lifecycle" >/dev/null 2>&1; then
+    cf DELETE "$acct/workflows/$name-envelope-lifecycle" >/dev/null && echo "workflow: deleted $name-envelope-lifecycle"
+  fi
   id="$(container_app_id "$name-pdfengine")"
   if [ -n "$id" ]; then
     cf DELETE "$acct/containers/applications/$id" >/dev/null && echo "container: deleted $name-pdfengine"

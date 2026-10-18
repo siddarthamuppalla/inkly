@@ -8,8 +8,10 @@ description: Deploy, list, or tear down a per-PR Cloudflare preview environment 
 Per-PR preview environments (Q9). Each PR gets its own isolated `inkly-pr-<n>`:
 a Worker, a D1 database, an R2 bucket, a KV namespace, a Job queue
 (`inkly-pr-<n>-jobs`) and a pdf-engine Container application (`inkly-pr-<n>-pdfengine`,
-created by `wrangler deploy`, which builds the image and so needs Docker). Test hooks are on, with a
-fresh `TEST_HOOKS_SECRET` on every deploy. Production is never touched; deploying
+created by `wrangler deploy`, which builds the image and so needs Docker). Its
+`EnvelopeLifecycle` Workflow is renamed `inkly-pr-<n>-envelope-lifecycle`, because Workflow
+names are per account. Test hooks are on, with a fresh `TEST_HOOKS_SECRET` on every deploy;
+`preview.yml` also sets a fresh Document seal key pair (`SEAL_PRIVATE_KEY`, `SEAL_CERTIFICATE`). Production is never touched; deploying
 production is human-only.
 
 ## Setup (human, once)
@@ -23,7 +25,7 @@ verifies it with Cloudflare without echoing it, and sets the GitHub secrets
   against the URL, and comments the URL on the PR. It is skipped (green) while the
   secrets are not set.
 - `.github/workflows/preview-teardown.yml` runs on PR close. It deletes all six
-  resources and fails if any remain.
+  resources, plus the Workflow, and fails if any of the six remain.
 - `.github/workflows/preview-sweep.yml` runs nightly and on demand. It tears down
   every `inkly-pr-*` whose PR is no longer open.
 

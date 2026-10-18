@@ -57,6 +57,8 @@ config.queues = {
   producers: config.queues.producers.map((p) => (p.binding === "JOBS" ? { ...p, queue: jobs } : p)),
   consumers: config.queues.consumers.map((c) => ({ ...c, queue: jobs })),
 };
+// Workflow names are per account, so each environment names its own (T3.5).
+config.workflows = config.workflows.map((w) => ({ ...w, name: `${name}-${w.name}` }));
 // Previews never send real mail: it lands in the Outbox (Q5).
 if (!production) config.vars = { ...config.vars, TEST_HOOKS: "enabled", EMAIL_PROVIDER: "outbox" };
 
