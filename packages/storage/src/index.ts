@@ -18,6 +18,7 @@ export {
   addVersion,
   createDocument,
   getDocument,
+  getVersion,
   listDocuments,
   listVersions,
   openVersion,
@@ -61,3 +62,14 @@ export {
   type NewShareLink,
   type ShareLinkRow,
 } from "./share-links.ts";
+export {
+  auditHead,
+  getEnvelope,
+  listAuditEvents,
+  listEnvelopes,
+  listFields,
+  listRecipients,
+  type EnvelopeRow,
+  type FieldRow,
+  type RecipientRow,
+} from "./envelopes.ts";
