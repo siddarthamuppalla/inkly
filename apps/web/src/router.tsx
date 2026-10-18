@@ -20,6 +20,11 @@ export const router = createBrowserRouter([
     lazy: async () => ({ Component: (await import("./routes/shared.tsx")).SharedRoute }),
   },
   {
+    path: "sign/:token",
+    HydrateFallback: () => null,
+    lazy: async () => ({ Component: (await import("./routes/sign.tsx")).SignRoute }),
+  },
+  {
     Component: AppShell,
     children: [
       { path: "design", Component: DesignRoute },

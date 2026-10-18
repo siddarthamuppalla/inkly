@@ -39,6 +39,8 @@
   --annot-green: #7ed67e;
   --annot-blue: #7fb0ff;
   --annot-red: #ff8a80;
+  /* Adopted signatures are drawn in fountain-pen blue for the white page, in both themes. */
+  --signature-ink: #1a3fa8;
 
   --radius: 0.375rem;
   --fold: 1.25rem;
