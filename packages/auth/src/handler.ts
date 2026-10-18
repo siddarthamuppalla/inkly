@@ -1,4 +1,5 @@
 import { AppError } from "@inkly/domain";
+import { step } from "@inkly/domain/log";
 import { countWindowHit } from "@inkly/storage/auth";
 
 import { getAuth } from "./better-auth.ts";
@@ -62,11 +63,14 @@ export async function handleAuthRequest(request: Request, env: AuthEnv): Promise
   }
   const auth = getAuth(env, request.url);
   if (!CODE_REQUESTS.has(path)) return auth.handler(request);
-  const email = await emailOf(request);
-  if (email) await limitCodeRequests(env, email);
+  // Step markers (#72): a send that never answered on the preview stopped in one of these.
+  const email = await step("read_email", () => emailOf(request));
+  if (email) await step("rate_limit", () => limitCodeRequests(env, email));
   // Better-Auth swallows a failed send and answers success; surface it instead, so
   // the sign-in page never says "Check your email" for mail that was not sent.
-  const { result, failed } = await withEmailFailures(() => auth.handler(request));
+  const { result, failed } = await step("auth_handler", () =>
+    withEmailFailures(() => auth.handler(request)),
+  );
   if (failed) {
     throw new AppError(
       "email_failed",

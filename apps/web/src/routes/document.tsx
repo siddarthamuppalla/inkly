@@ -21,21 +21,12 @@ import { UploadButton, UploadStatus, useUpload } from "../components/upload.tsx"
 import { ApiError } from "../lib/api.ts";
 import { leaveForTrash } from "../lib/annotations-api.ts";
 import { documentsApi } from "../lib/documents-api.ts";
+import { saveFile } from "../lib/download.ts";
+import { envelopeKeys, envelopesApi } from "../lib/envelopes-api.ts";
 import { folderChoices, folderPath } from "../lib/folders.ts";
 import { formatBytes, formatDateTime, formatPages } from "../lib/format.ts";
 import { keys, queryClient, refreshAll, useFolders } from "../lib/queries.ts";
-
-/** Saves fetched bytes, so a download carries the same credentials as every API call. */
-function saveFile(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 60_000);
-}
+import { useMe } from "../lib/session.ts";
 
 function errorText(err: unknown): string {
   return err instanceof ApiError ? err.message : "Something went wrong. Try again.";
@@ -157,7 +148,16 @@ function Viewer({ doc }: { readonly doc: DocumentInfo }) {
 
 function Actions({ doc }: { readonly doc: DocumentInfo }) {
   const navigate = useNavigate();
+  const me = useMe();
   const trashed = doc.deletedAt !== null;
+  const canSend = !trashed && Boolean(me?.role) && me?.role !== "viewer";
+  const sendForSignature = useMutation({
+    mutationFn: () => envelopesApi.create(doc.id),
+    onSuccess: async (created) => {
+      queryClient.setQueryData(envelopeKeys.envelope(created.envelope.id), created);
+      await navigate(`/envelopes/${created.envelope.id}`);
+    },
+  });
   const trash = useMutation({
     mutationFn: (toTrash: boolean) =>
       toTrash ? documentsApi.trashDocument(doc.id) : documentsApi.restoreDocument(doc.id),
@@ -204,6 +204,25 @@ function Actions({ doc }: { readonly doc: DocumentInfo }) {
           </UploadButton>
         </div>
         <UploadStatus state={state} />
+        {canSend && (
+          <div className="flex flex-col gap-2">
+            <Button
+              variant="secondary"
+              className="self-start"
+              loading={sendForSignature.isPending}
+              onClick={() => {
+                sendForSignature.mutate();
+              }}
+            >
+              Send for signature
+            </Button>
+            {sendForSignature.isError && (
+              <p role="alert" className="text-sm font-medium text-destructive">
+                {errorText(sendForSignature.error)}
+              </p>
+            )}
+          </div>
+        )}
         <RenameForm doc={doc} />
         <MoveForm doc={doc} />
         <div className="flex flex-col gap-2">

@@ -40,6 +40,25 @@
   --annot-blue: #7fb0ff;
   --annot-red: #ff8a80;
 
+  /*
+   * Envelope fields also sit on the PDF page in both themes: each Recipient's ink on the
+   * field surface tinted 12% with that ink (the -fill tokens; FIELD_TINT in test/contrast.ts), outlined in field-ink when focused.
+   */
+  --field-surface: #ffffff;
+  --field-ink: #1b2333;
+  --recipient-1: #1a47c2;
+  --recipient-2: #1d6b3c;
+  --recipient-3: #7a3db8;
+  --recipient-4: #0e6670;
+  --recipient-5: #8a4b08;
+  --recipient-6: #a3236d;
+  --recipient-1-fill: color-mix(in srgb, var(--recipient-1) 12%, var(--field-surface));
+  --recipient-2-fill: color-mix(in srgb, var(--recipient-2) 12%, var(--field-surface));
+  --recipient-3-fill: color-mix(in srgb, var(--recipient-3) 12%, var(--field-surface));
+  --recipient-4-fill: color-mix(in srgb, var(--recipient-4) 12%, var(--field-surface));
+  --recipient-5-fill: color-mix(in srgb, var(--recipient-5) 12%, var(--field-surface));
+  --recipient-6-fill: color-mix(in srgb, var(--recipient-6) 12%, var(--field-surface));
+
   --radius: 0.375rem;
   --fold: 1.25rem;
   --duration-fast: 150ms;
@@ -77,5 +96,14 @@
     --ring: #8fb3ff;
     --rule: #6b3a37;
     --shadow-color: #00000099;
+
+    --field-surface: #f3efe6;
+    --field-ink: #14171f;
+    --recipient-1: #1c3fa0;
+    --recipient-2: #195c34;
+    --recipient-3: #6a32a3;
+    --recipient-4: #0b5a63;
+    --recipient-5: #7a4206;
+    --recipient-6: #8f1e5f;
   }
 }
