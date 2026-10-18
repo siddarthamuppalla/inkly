@@ -1,5 +1,5 @@
 // verify-tenancy: as tenant A, try to reach tenant B's Documents, Versions, folders,
-// content, Share links, activity, Envelopes and workspace every way we know. Every attempt must be refused (403/404) and leave an
+// content, Share links, activity, Envelopes, signer links and workspace every way we know. Every attempt must be refused (403/404) and leave an
 // access-log entry.
 
 import { randomBytes } from "node:crypto";
@@ -120,6 +120,145 @@ const sha256Hex = async (bytes: ArrayBuffer) =>
   [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+
+const SIGN_LINK = /\/sign\/([A-Za-z0-9_-]{43})\b/;
+const PNG =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+async function newestMail(baseUrl: string, secret: string, to: string): Promise<string[]> {
+  const url = new URL("/__test/outbox", baseUrl);
+  url.searchParams.set("to", to);
+  const res = await fetch(url, { headers: { "x-test-hooks-secret": secret } });
+  const body = (await res.json()) as { messages?: { text: string }[] };
+  return (body.messages ?? []).map((m) => m.text);
+}
+
+/**
+ * T3.3 signer links: a token for A's Envelope reads only that Envelope, whatever else the
+ * request names; its grant opens nothing else; it can't set B's Fields; voided and unknown
+ * tokens are the same 404. Each finding is pushed to `problems`.
+ */
+async function attackSignerLinks(
+  baseUrl: string,
+  secret: string,
+  a: Seeded,
+  b: Seeded,
+  docA: Doc,
+  sentB: Envelope,
+  problems: string[],
+): Promise<void> {
+  const signerA = `tenancy-signer-${randomBytes(4).toString("hex")}@seed.inkly.test`;
+  const draft = {
+    title: "A's lease",
+    recipients: [{ id: "rcp_asigner", name: "A Signer", email: signerA, role: "signer" }],
+    fields: [
+      {
+        recipientId: "rcp_asigner",
+        kind: "signature",
+        page: 1,
+        rect: { x: 0.1, y: 0.8, w: 0.3, h: 0.05 },
+      },
+    ],
+  };
+  const sendA = async () => {
+    const made = await created<{ envelope: Envelope }>(
+      await call(baseUrl, a, "POST", "/api/envelopes", json({ documentId: docA.id })),
+      "create A's envelope",
+    );
+    await (
+      await call(baseUrl, a, "PUT", `/api/envelopes/${made.envelope.id}`, json(draft))
+    ).arrayBuffer();
+    await (await call(baseUrl, a, "POST", `/api/envelopes/${made.envelope.id}/send`)).arrayBuffer();
+    const token = SIGN_LINK.exec((await newestMail(baseUrl, secret, signerA))[0] ?? "")?.[1];
+    if (!token) throw new Error("no signing link for A's signer");
+    return { id: made.envelope.id, token };
+  };
+  const live = await sendA();
+  const voided = await sendA();
+  await (
+    await call(baseUrl, a, "POST", `/api/envelopes/${voided.id}/void`, json({ reason: "test" }))
+  ).arrayBuffer();
+  const tokenB = SIGN_LINK.exec(
+    (await newestMail(baseUrl, secret, "b-signer@seed.inkly.test"))[0] ?? "",
+  )?.[1];
+  if (!tokenB) throw new Error("no signing link for B's signer");
+  const bFields =
+    (
+      (await (await call(baseUrl, b, "GET", `/api/envelopes/${sentB.id}`)).json()) as {
+        fields?: { id: string }[];
+      }
+    ).fields ?? [];
+
+  const sign = (path: string, init: RequestInit = {}) =>
+    fetch(new URL(`/api/sign/${path}`, baseUrl), init);
+  const post = (path: string, body: unknown, cookie = "") =>
+    sign(path, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify(body),
+    });
+  await (await post(`${live.token}/code`, {})).arrayBuffer();
+  const code = /\b(\d{6})\b/.exec((await newestMail(baseUrl, secret, signerA))[0] ?? "")?.[1] ?? "";
+  const verified = await post(`${live.token}/verify`, { code });
+  await verified.arrayBuffer();
+  const cookie = (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+  if (verified.status !== 204 || cookie === "") {
+    problems.push(`control: A's signer could not verify (${String(verified.status)})`);
+    return;
+  }
+
+  const own = await sign(`${live.token}/content?envelopeId=${sentB.id}&tenant=${b.tenantId}`, {
+    headers: { cookie, authorization: `Bearer ${b.token}`, "x-inkly-tenant": b.tenantId },
+  });
+  if (own.status !== 200 || (await sha256Hex(await own.arrayBuffer())) !== docA.sha256) {
+    problems.push("A's signer link served something other than A's Document");
+  }
+  const crossGrant = await sign(`${tokenB}/content`, { headers: { cookie } });
+  await crossGrant.arrayBuffer();
+  if (crossGrant.status !== 401) {
+    problems.push(`A's signer grant opened B's link content (${String(crossGrant.status)})`);
+  }
+  for (const field of bFields) {
+    const res = await post(
+      `${live.token}/sign`,
+      { values: { [field.id]: PNG }, consent: true },
+      cookie,
+    );
+    await res.arrayBuffer();
+    if (res.status !== 422) {
+      problems.push(`A's signer set B's field ${field.id} (${String(res.status)}), expected 422`);
+    }
+  }
+  for (const [name, token] of [
+    ["a voided Envelope's link", voided.token],
+    ["an unknown link", randomBytes(32).toString("base64url")],
+  ] as const) {
+    for (const [method, path] of [
+      ["GET", ""],
+      ["POST", "/code"],
+      ["GET", "/content"],
+      ["POST", "/decline"],
+    ] as const) {
+      const res = await sign(`${token}${path}`, {
+        method,
+        headers: { cookie, "content-type": "application/json" },
+        ...(method === "POST" ? { body: JSON.stringify({ reason: "x" }) } : {}),
+      });
+      const body = await res.text();
+      if (res.status !== 404 || !body.includes("This link is no longer available")) {
+        problems.push(
+          `${name}: ${method} /api/sign/…${path} returned ${String(res.status)} ${body.slice(0, 80)}`,
+        );
+      }
+    }
+  }
+  const bLog = await fetch(new URL(`/__test/access-log?tenant=${b.tenantId}`, baseUrl), {
+    headers: { "x-test-hooks-secret": secret },
+  });
+  if ((await bLog.text()).includes("rcp_asigner")) {
+    problems.push("A's signer requests were logged in B's access log");
+  }
+}
 
 export async function attackTenancy(baseUrl: string, secret: string): Promise<TenancyReport> {
   const problems: string[] = [];
@@ -704,6 +843,11 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     problems.push(
       `access log has ${String(deniedEntries)} denial entries for ${String(deniedCount)} denied attempts`,
     );
+  }
+  // After the access-log count above: signer requests log to the link's own Tenant (A).
+  await attackSignerLinks(baseUrl, secret, a, b, docA, sentB, problems);
+  if ((await envelopesOfB()) !== envelopesB) {
+    problems.push("B's Envelopes or audit trails changed after the signer-link attacks");
   }
   for (const t of attempts) {
     if (!t.denied) problems.push(`${t.name}: ${t.method} ${t.path} returned ${String(t.status)}`);

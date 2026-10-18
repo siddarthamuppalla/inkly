@@ -463,7 +463,11 @@ function SignPage({
           };
           const frame = cn(
             "absolute flex items-center justify-center overflow-hidden rounded-sm border-2 text-xs",
-            filled ? "border-link border-solid" : "border-seal border-dashed",
+            filled
+              ? "border-link border-solid"
+              : field.required
+                ? "border-seal border-dashed"
+                : "border-input border-dashed",
             current === field.id && "ring-2 ring-ring ring-offset-1",
           );
           const keep = (el: HTMLElement | null) => {

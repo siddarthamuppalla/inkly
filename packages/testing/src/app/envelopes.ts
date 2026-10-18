@@ -441,18 +441,29 @@ const J018: Journey = {
       "signer 2's Finish did not show the signed state",
     );
 
-    const done = await asSender(ctx, who, "GET", `/api/envelopes/${sequence.id}`);
-    expect(
-      done.body.envelope?.status === "completing",
-      `after both signed the Envelope is ${String(done.body.envelope?.status)}`,
-    );
+    // The last signature hands the Envelope to its Workflow, which finalizes it (T3.5).
+    let status = "";
+    for (let i = 0; i < 60 && status !== "completed"; i++) {
+      const done = await asSender(ctx, who, "GET", `/api/envelopes/${sequence.id}`);
+      status = done.body.envelope?.status ?? "";
+      if (status !== "completed") await page.waitForTimeout(500);
+    }
+    expect(status === "completed", `after both signed the Envelope is ${status}`);
     const audit = await asSender(ctx, who, "GET", `/api/envelopes/${sequence.id}/audit`);
     const actions = (audit.body.events ?? []).map((e) => e.action);
     expect(
       actions.join(",") ===
-        "created,sent,notified,code_sent,verified,viewed,signed,notified,code_sent,verified,viewed,signed",
+        "created,sent,notified,code_sent,verified,viewed,signed,notified,code_sent,verified,viewed,signed,completed",
       `audit actions are ${actions.join(",")}`,
     );
+    const [completionLink] = await signLinks(ctx, ana);
+    await page.goto(new URL(`/sign/${completionLink ?? ""}`, baseUrl).toString());
+    await reach(
+      ctx,
+      page.getByRole("link", { name: "Download the signed PDF" }).waitFor(WAIT),
+      "the completion link does not offer the signed PDF",
+    );
+    await ctx.checkpoint("completed");
     expect(audit.body.chain?.valid === true, "the audit chain does not verify");
   },
 };
