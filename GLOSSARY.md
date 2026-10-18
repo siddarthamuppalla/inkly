@@ -86,6 +86,21 @@ _Avoid_: public link
 
 **Certificate of completion**: PDF summary of an envelope's audit trail appended to the signed doc.
 
+**Envelope status**: `draft`, `sent`, `completing`, `completed`, `declined`, `voided` or `expired` (ADR-0006). Only a draft can be edited or deleted.
+
+**Routing order**: A Recipient's position when an Envelope is sequential; order 2 is emailed once everyone at order 1 has signed. In parallel order every signer is emailed at send.
+
+**Signer link**: The emailed `/sign/{token}` URL for one Recipient; only the token's sha256 is stored. It shows the title and sender until the signer confirms a Signing code.
+_Avoid_: share link (that is for Members' Documents)
+
+**Signing code**: The 6-digit, 10-minute code emailed to a Recipient to prove control of their inbox before they view or sign.
+_Avoid_: OTP (in UI copy), Sign-in code (that is for Users)
+
+**Finalize**: Stamping Field values, appending the Certificate of completion and applying the Document seal, producing the Envelope's sealed Version.
+
+**Document seal**: The PAdES signature with Inkly's seal key over a finalized Envelope's PDF; any changed byte makes it fail validation.
+_Avoid_: Seal (that is the red accent color)
+
 ## Processing
 
 **Job**: Async unit of work on a Queue, possibly executed in the pdf-engine Container.
