@@ -7,6 +7,13 @@ export {
 } from "./load.ts";
 export { fillForm, readFormFields } from "./forms.ts";
 export { withAnnotations } from "./annotate.ts";
+export {
+  appendCertificate,
+  type CertificateEvent,
+  type CertificateParty,
+  type CertificateRecipient,
+  type CompletionCertificate,
+} from "./certificate.ts";
 export { stampFields, type StampField, type StampFieldKind } from "./stamp.ts";
 export { MAX_SIGNATURE_BYTES } from "./text.ts";
 export { deletePages, merge, reorder, rotate, split } from "./ops.ts";
