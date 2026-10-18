@@ -1,3 +1,4 @@
+import type { RequestLog } from "@inkly/domain/log";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import app from "../src/index.ts";
@@ -7,10 +8,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function requestLines(spy: { mock: { calls: unknown[][] } }) {
-  return spy.mock.calls
-    .map(([text]) => (typeof text === "string" && text.startsWith("{") ? JSON.parse(text) : null))
-    .filter((l: { event?: string } | null) => l?.event?.startsWith("request_"));
+function requestLines(spy: { mock: { calls: unknown[][] } }): RequestLog[] {
+  const lines: RequestLog[] = [];
+  for (const [text] of spy.mock.calls) {
+    if (typeof text !== "string" || !text.startsWith("{")) continue;
+    const line = JSON.parse(text) as Partial<RequestLog>;
+    if (line.event === "request_start" || line.event === "request_end")
+      lines.push(line as RequestLog);
+  }
+  return lines;
 }
 
 describe("request log (#72)", () => {
@@ -19,6 +25,7 @@ describe("request log (#72)", () => {
     const res = await app.request(`${ORIGIN}/api/documents`, {}, hooks);
     expect(res.status).toBe(401);
     const [start, end] = requestLines(spy);
+    if (!start || !end) throw new Error("expected a request_start and a request_end line");
     expect(start).toMatchObject({ event: "request_start", method: "GET", path: "/api/documents" });
     expect(end).toMatchObject({ event: "request_end", status: 401, requestId: start.requestId });
     expect(typeof end.ms).toBe("number");
