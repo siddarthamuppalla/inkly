@@ -21,12 +21,14 @@ All are jobs in `.github/workflows/ci.yml`, except `preview` (`preview.yml`):
 | `audit` | `pnpm audit --audit-level high` |
 | `prod-config` | production `wrangler.jsonc` has no `TEST_HOOKS` (Q11) |
 | `secrets` | gitleaks |
-| `workflows` | `node --test scripts/auto-merge.test.mjs` (auto-merge guardrails) and `actionlint` with shellcheck |
+| `workflows` | `scripts/bot-guard.test.sh` (bot guards), `node --test scripts/auto-merge.test.mjs` (auto-merge guardrails) and `actionlint` with shellcheck |
 | `preview` | deploys `inkly-pr-<n>` to Cloudflare, then `verify-app --all` and `verify-tenancy` against it. Fails when the Cloudflare secrets are missing; fork PRs skip it. |
 
 `verdict` (T1.7) is not required: it
 only restates the jobs above as one PASS/FAIL comment on the PR, and it skips on
 pushes to `main` and on fork PRs.
+
+`triage` and `pr-watcher` (T2.5) are event-driven bots, not required PR status checks. Both gate through `scripts/bot-guard.sh`; `factory-pause` or `FACTORY_PAUSED=true` stops them.
 
 ## Apply it
 With the GitHub CLI signed in as a repo admin:
