@@ -195,7 +195,7 @@ export async function listVersions(
   return results;
 }
 
-async function getVersion(
+export async function getVersion(
   tenantId: TenantId,
   env: StorageEnv,
   id: DocumentId,

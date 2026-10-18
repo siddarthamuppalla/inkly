@@ -1,4 +1,12 @@
-import type { DocumentId, JobId, TenantId, UserId } from "@inkly/domain";
+import type {
+  DocumentId,
+  EnvelopeId,
+  FieldId,
+  JobId,
+  RecipientId,
+  TenantId,
+  UserId,
+} from "@inkly/domain";
 
 // ADR-0004: TenantId and UserId are minted only here. A TenantId for an existing
 // tenant comes from session.ts, after the membership check.
@@ -25,4 +33,19 @@ export function mintDocumentId(): DocumentId {
 /** A new JobId. */
 export function mintJobId(): JobId {
   return newId("job") as JobId;
+}
+
+/** A new EnvelopeId. */
+export function mintEnvelopeId(): EnvelopeId {
+  return newId("env") as EnvelopeId;
+}
+
+/** A new RecipientId. */
+export function mintRecipientId(): RecipientId {
+  return newId("rcp") as RecipientId;
+}
+
+/** A new FieldId. */
+export function mintFieldId(): FieldId {
+  return newId("fld") as FieldId;
 }

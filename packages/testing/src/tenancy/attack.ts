@@ -1,5 +1,5 @@
 // verify-tenancy: as tenant A, try to reach tenant B's Documents, Versions, folders,
-// content, Share links, activity and workspace every way we know. Every attempt must be refused (403/404) and leave an
+// content, Share links, activity, Envelopes and workspace every way we know. Every attempt must be refused (403/404) and leave an
 // access-log entry.
 
 import { randomBytes } from "node:crypto";
@@ -111,6 +111,11 @@ interface Link {
   url: string;
 }
 
+interface Envelope {
+  id: string;
+  status: string;
+}
+
 const sha256Hex = async (bytes: ArrayBuffer) =>
   [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
     .map((b) => b.toString(16).padStart(2, "0"))
@@ -183,8 +188,58 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
   const linkB = await shareOf(b, sharedB.document.id);
   const linkA = await shareOf(a, docA.id);
 
+  const envelopeOf = async (who: Seeded, doc: Doc) =>
+    (
+      await created<{ envelope: Envelope }>(
+        await call(baseUrl, who, "POST", "/api/envelopes", json({ documentId: doc.id })),
+        "create envelope",
+      )
+    ).envelope;
+  const signerDraft = (email: string) => ({
+    title: "B's lease",
+    recipients: [{ id: "rcp_signer", name: "Signer", email, role: "signer" }],
+    fields: [
+      {
+        recipientId: "rcp_signer",
+        kind: "signature",
+        page: 1,
+        rect: { x: 0.1, y: 0.8, w: 0.3, h: 0.05 },
+      },
+    ],
+  });
+  const draftB = await envelopeOf(b, docB);
+  const sentB = await envelopeOf(b, docB);
+  for (const id of [draftB.id, sentB.id]) {
+    const res = await call(
+      baseUrl,
+      b,
+      "PUT",
+      `/api/envelopes/${id}`,
+      json(signerDraft("b-signer@seed.inkly.test")),
+    );
+    await res.arrayBuffer();
+    if (res.status !== 200) throw new Error(`B's envelope PUT returned ${String(res.status)}`);
+  }
+  const sendB = await call(baseUrl, b, "POST", `/api/envelopes/${sentB.id}/send`);
+  await sendB.arrayBuffer();
+  if (sendB.status !== 200) throw new Error(`B's send returned ${String(sendB.status)}`);
+  const envelopeA = await envelopeOf(a, docA);
+  const envelopesOfB = async () =>
+    JSON.stringify(
+      await Promise.all(
+        [draftB.id, sentB.id].flatMap((id) =>
+          [`/api/envelopes/${id}`, `/api/envelopes/${id}/audit`].map(async (path) =>
+            (await call(baseUrl, b, "GET", path)).json(),
+          ),
+        ),
+      ),
+    );
+  const envelopesB = await envelopesOfB();
+
   // Control: A can reach its own data, so a denial below is a real denial, not a broken route.
   for (const path of [
+    `/api/envelopes/${envelopeA.id}`,
+    `/api/envelopes/${envelopeA.id}/audit`,
     `/api/documents/${docA.id}`,
     `/api/documents/${docA.id}/content`,
     `/api/documents/${docA.id}/versions`,
@@ -471,6 +526,64 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
     },
   );
 
+  const envelopePath = (id: string) => `/api/envelopes/${id}`;
+  plan.push(
+    {
+      name: "list B's Envelopes claiming B's tenant",
+      method: "GET",
+      path: "/api/envelopes",
+      init: { headers: asB },
+    },
+    { name: "list B's Envelopes", method: "GET", path: `/api/envelopes?tenant=${b.tenantId}` },
+    {
+      name: "draft an Envelope from B's Document",
+      method: "POST",
+      path: "/api/envelopes",
+      init: json({ documentId: docB.id }),
+    },
+    { name: "read B's Envelope", method: "GET", path: envelopePath(sentB.id) },
+    {
+      name: "read B's Envelope claiming B's tenant",
+      method: "GET",
+      path: envelopePath(sentB.id),
+      init: { headers: asB },
+    },
+    {
+      name: "update B's draft Envelope",
+      method: "PUT",
+      path: envelopePath(draftB.id),
+      init: json(signerDraft("intruder@seed.inkly.test")),
+    },
+    { name: "delete B's draft Envelope", method: "DELETE", path: envelopePath(draftB.id) },
+    { name: "send B's draft Envelope", method: "POST", path: `${envelopePath(draftB.id)}/send` },
+    {
+      name: "void B's sent Envelope",
+      method: "POST",
+      path: `${envelopePath(sentB.id)}/void`,
+      init: json({ reason: "pwned" }),
+    },
+    {
+      name: "void B's sent Envelope claiming B's tenant",
+      method: "POST",
+      path: `${envelopePath(sentB.id)}/void`,
+      init: {
+        ...json({ reason: "pwned" }),
+        headers: { "content-type": "application/json", ...asB },
+      },
+    },
+    { name: "remind B's signers", method: "POST", path: `${envelopePath(sentB.id)}/remind` },
+    {
+      name: "read B's Envelope audit trail",
+      method: "GET",
+      path: `${envelopePath(sentB.id)}/audit`,
+    },
+    {
+      name: "fetch B's Envelope content",
+      method: "GET",
+      path: `${envelopePath(sentB.id)}/content`,
+    },
+  );
+
   const attempts: Attempt[] = [];
   for (const live of [
     { name: "open B's live annotations WebSocket", path: `${ann}/live` },
@@ -500,6 +613,17 @@ export async function attackTenancy(baseUrl: string, secret: string): Promise<Te
   }
 
   if ((await annotationsOf(b, docB)) !== annotationsB) problems.push("B's Annotations changed");
+  if ((await envelopesOfB()) !== envelopesB) problems.push("B's Envelopes or audit trails changed");
+  const ownEnvelopes = (await (await call(baseUrl, a, "GET", "/api/envelopes")).json()) as {
+    envelopes?: Envelope[];
+  };
+  const ownEnvelopeIds = (ownEnvelopes.envelopes ?? []).map((e) => e.id);
+  if (ownEnvelopeIds.some((id) => id === draftB.id || id === sentB.id)) {
+    problems.push("A's Envelope list includes B's Envelope");
+  }
+  if (ownEnvelopeIds.join() !== envelopeA.id) {
+    problems.push(`control: A's Envelope list is ${JSON.stringify(ownEnvelopeIds)}`);
+  }
   const docNow = async (id: string) => {
     const res = await call(baseUrl, b, "GET", `/api/documents/${id}`);
     return res.status === 200 ? ((await res.json()) as { document: Doc }).document : null;
