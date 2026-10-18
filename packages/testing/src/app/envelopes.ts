@@ -658,7 +658,15 @@ const J018: Journey = {
         "created,sent,notified,code_sent,verified,viewed,signed,notified,code_sent,verified,viewed,signed,completed",
       `audit actions are ${actions.join(",")}`,
     );
-    const [completionLink] = await signLinks(ctx, ana);
+    // finalize commits `completed` before it emails the Recipients, so wait for Ana's
+    // completion email (her second link) rather than reading her invite link.
+    let anaLinks = await signLinks(ctx, ana);
+    for (let i = 0; i < 60 && anaLinks.length < 2; i++) {
+      await page.waitForTimeout(500);
+      anaLinks = await signLinks(ctx, ana);
+    }
+    expect(anaLinks.length >= 2, "Ana got no completion email after the Envelope completed");
+    const [completionLink] = anaLinks;
     await page.goto(new URL(`/sign/${completionLink ?? ""}`, baseUrl).toString());
     await reach(
       ctx,
