@@ -100,6 +100,8 @@ _Avoid_: OTP (in UI copy), Sign-in code (that is for Users)
 
 **Finalize**: Stamping Field values, appending the Certificate of completion and applying the Document seal, producing the Envelope's sealed Version.
 
+**Envelope lifecycle**: The `EnvelopeLifecycle` Workflow instance of one sent Envelope: it reminds pending signers every 3 days, expires the Envelope at `expires_at` and runs Finalize until it succeeds. It only calls Envelope DO methods.
+
 **Document seal**: The PAdES signature with Inkly's seal key over a finalized Envelope's PDF; any changed byte makes it fail validation.
 _Avoid_: Seal (that is the red accent color)
 

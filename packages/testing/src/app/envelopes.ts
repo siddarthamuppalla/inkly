@@ -331,6 +331,16 @@ const J016: Journey = {
       `after deleting a draft /envelopes lists ${String(await page.getByTestId("envelope-row").count())} envelopes, expected 2`,
     );
     await ctx.checkpoint("list");
+
+    // T3.5: the Document seal certificate is public, so anyone can check a sealed PDF.
+    const seal = await page.evaluate<{ status: number; text: string }, string>(
+      (p) => fetch(p).then(async (r) => ({ status: r.status, text: await r.text() })),
+      "/api/seal-certificate",
+    );
+    expect(
+      seal.status === 200 && seal.text.includes("-----BEGIN CERTIFICATE-----"),
+      `GET /api/seal-certificate returned ${String(seal.status)}`,
+    );
   },
 };
 

@@ -54,6 +54,16 @@ jobs:
           PREVIEW_SECRET_FILE="$secret_file" .claude/skills/cf-deploy-preview/run.sh "$PR" | tee "$RUNNER_TEMP/deploy.log"
           echo "::add-mask::$(cat "$secret_file")"
           echo "url=$(sed -n 's/^url: //p' "$RUNNER_TEMP/deploy.log")" >> "$GITHUB_OUTPUT"
+      # T3.5: a fresh Document seal key pair per preview, held only in this step's memory.
+      - name: seal key for inkly-pr-${{ github.event.pull_request.number }}
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          pair="$(node --disable-warning=ExperimentalWarning scripts/seal-key.mjs --json)"
+          for name in SEAL_PRIVATE_KEY SEAL_CERTIFICATE; do
+            jq -r --arg n "$name" '.[$n]' <<<"$pair" |
+              pnpm --filter @inkly/api exec wrangler secret put "$name" -c wrangler.preview.json >/dev/null
+          done
+          echo "seal key: set (certificate at /api/seal-certificate)"
       - name: list resources (exactly one of each)
         if: steps.secrets.outputs.ready == 'true'
         run: |

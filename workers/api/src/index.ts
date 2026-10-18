@@ -6,7 +6,7 @@ import { account } from "./account.ts";
 import { activityRoutes, recordDocumentEdits } from "./activity.ts";
 import { annotationRoutes } from "./annotations.ts";
 import { documentRoutes } from "./documents.ts";
-import { envelopeRoutes } from "./envelopes.ts";
+import { envelopeRoutes, sealCertificateRoutes } from "./envelopes.ts";
 import type { Env } from "./env.ts";
 import { onAppError } from "./errors.ts";
 import { folderRoutes } from "./folders.ts";
@@ -21,6 +21,7 @@ import { testHooks } from "./test-hooks.ts";
 export type { Env } from "./env.ts";
 export { DocSession } from "./doc-session.ts";
 export { Envelope } from "./envelope/do.ts";
+export { EnvelopeLifecycle } from "./envelope/lifecycle.ts";
 export { PdfEngine } from "@inkly/jobs";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -52,6 +53,7 @@ app.route("/api/share-links", shareLinkRoutes);
 app.route("/api/share", sharedRoutes);
 app.use("/api/envelopes/*", requireTenant);
 app.route("/api/envelopes", envelopeRoutes);
+app.route("/api", sealCertificateRoutes);
 
 // verify-app fails a full run when one of these routes got no successful request from any
 // journey. Registered after the `/__test` guard, so it is a 404 without the secret.
