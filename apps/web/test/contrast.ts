@@ -26,7 +26,13 @@ export const CONTRAST_PAIRS: readonly { fg: string; bg: string; min: number }[] 
   ...onSurfaces("input", UI),
   ...onSurfaces("ring", UI),
   { fg: "ring", bg: "accent", min: UI },
+  { fg: "field-ink", bg: "field-surface", min: UI },
 ];
+
+/** How much of a Recipient's ink tints its fields' surface (`color-mix` in field-box.tsx). */
+export const FIELD_TINT = 0.12;
+export const RECIPIENT_INKS = [1, 2, 3, 4, 5, 6].map((n) => `recipient-${String(n)}`);
+
 
 /** Splits tokens.css into the light `:root` block and the dark-scheme override. */
 export function parseThemes(css: string): { light: Tokens; dark: Tokens } {
@@ -37,11 +43,23 @@ export function parseThemes(css: string): { light: Tokens; dark: Tokens } {
 
 function readVars(block: string): Tokens {
   const out: Record<string, string> = {};
-  for (const m of block.matchAll(/--([a-z-]+):\s*(#[0-9a-f]{6});/gi)) {
+  for (const m of block.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-f]{6});/gi)) {
     const [, name, value] = m;
     if (name && value) out[name] = value.toLowerCase();
   }
   return out;
+}
+
+/** `color-mix(in srgb, a t, b)`: `t` of `a` over `b`, per channel. */
+export function mix(a: string, b: string, t: number): string {
+  const channel = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
+  return `#${[1, 3, 5]
+    .map((i) =>
+      Math.round(channel(a, i) * t + channel(b, i) * (1 - t))
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
 }
 
 function luminance(hex: string): number {
