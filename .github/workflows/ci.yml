@@ -95,6 +95,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version-file: .nvmrc }
+      - run: scripts/bot-guard.test.sh
       - run: node --test scripts/auto-merge.test.mjs scripts/cf-lib.test.mjs scripts/check-prod-config.test.mjs
       - name: actionlint (runs shellcheck on every run block)
         run: |
