@@ -4,18 +4,30 @@ import {
   mintFieldId,
   mintRecipientId,
   mintSignerToken,
+  mintSigningCode,
+  signingCodeMatches,
   type Mail,
+  type OpenSigner,
 } from "@inkly/auth";
 import {
   AppError,
   canTransition,
   chained,
+  CONSENT_TEXT,
   envelopeLimitError,
+  everySignerSigned,
+  fieldFilled,
+  fieldValueProblem,
   firstTurn,
   GENESIS,
   isAppError,
+  nextTurn,
   PLAN_LIMITS,
   sendProblem,
+  sha256Hex,
+  SIGNING_CODE,
+  signingDate,
+  type SignerSign,
   type AppErrorCode,
   type AuditAction,
   type AuditEvent,
@@ -34,6 +46,7 @@ import {
   getEnvelope,
   getVersion,
   listFields,
+  listMembers,
   listRecipients,
   type DocumentRow,
   type EnvelopeRow,
@@ -45,6 +58,7 @@ import {
   commitEnvelope,
   deleteDraft,
   insertEnvelope,
+  readSignerSecrets,
   releaseEnvelope,
   replaceDraft,
   type EnvelopePatch,
@@ -59,7 +73,7 @@ import { tenantPlan } from "../upload.ts";
 // writer of its envelopes, recipients, fields and audit_events rows. Each mutation runs inside
 // blockConcurrencyWhile, so the status machine and the hash chain never see two writers.
 // Only the API Worker binds it, and it calls in only after an Envelope lookup in the caller's
-// Tenant (or, from T3.3, after packages/auth resolves a signer token).
+// Tenant, or after packages/auth resolves a signer token (the signer methods below, T3.3).
 
 export interface EnvelopeRef {
   readonly tenantId: TenantId;
@@ -75,6 +89,14 @@ export interface Sender {
   readonly userAgent: string | null;
 }
 
+/** A signer on their own link: the Recipient packages/auth resolved, and the link's hash. */
+export interface Signer {
+  readonly recipientId: RecipientId;
+  readonly tokenHash: string;
+  readonly ip: string | null;
+  readonly userAgent: string | null;
+}
+
 export interface EnvelopeDetail {
   readonly envelope: EnvelopeRow;
   readonly recipients: RecipientRow[];
@@ -85,9 +107,25 @@ export type EnvelopeOutcome<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly code: AppErrorCode; readonly message: string };
 
+/** Who sent `envelope`, as signers see them: the Member who drafted it. */
+export async function envelopeSender(
+  env: Env,
+  tenantId: TenantId,
+  envelope: EnvelopeRow,
+): Promise<{ name: string; email: string }> {
+  const member = (await listMembers(tenantId, env)).find((m) => m.userId === envelope.createdBy);
+  const email = member?.email ?? "";
+  return { name: member?.name.trim() || email.split("@")[0] || "An Inkly user", email };
+}
+
 /** The Envelope DO of `envelope`. Taking the looked-up row keeps callers from skipping the lookup. */
 export function envelopeObject(env: Env, tenantId: TenantId, envelope: EnvelopeRow) {
   return env.ENVELOPES.get(env.ENVELOPES.idFromName(`${tenantId}/${envelope.id}`));
+}
+
+/** The Envelope DO a signer link belongs to. Taking the resolved link keeps callers from skipping packages/auth. */
+export function signerObject(env: Env, signer: OpenSigner) {
+  return env.ENVELOPES.get(env.ENVELOPES.idFromName(`${signer.tenantId}/${signer.envelopeId}`));
 }
 
 /** A new Envelope's id and DO, for a draft of `doc` (already looked up in `tenantId`). */
@@ -121,6 +159,25 @@ const actorOf = (sender: Sender): Actor => ({
 
 function conflict(message: string): AppError {
   return new AppError("conflict", message);
+}
+
+/** Every refusal of a link that stopped working; the signer is not told why. */
+function linkGone(): AppError {
+  return new AppError("not_found", "This link is no longer available");
+}
+
+const signerActor = (signer: Signer): Actor => ({
+  id: signer.recipientId,
+  ip: signer.ip,
+  userAgent: signer.userAgent,
+});
+
+/** What the `signed` event records of a value: images by their sha256, the rest as typed. */
+function signedValue(kind: FieldRow["kind"], value: string | null): { [key: string]: JsonValue } {
+  if (value !== null && (kind === "signature" || kind === "initials")) {
+    return { sha256: sha256Hex(value) };
+  }
+  return { value };
 }
 
 export class Envelope extends DurableObject<Env> {
@@ -342,6 +399,255 @@ export class Envelope extends DurableObject<Env> {
     });
   }
 
+  /** Records the signer's first look at the document. Later opens change nothing. */
+  async viewed(ref: EnvelopeRef, signer: Signer): Promise<EnvelopeOutcome<null>> {
+    return this.mutate(ref, async () => {
+      const { recipient } = await this.signerTurn(ref, signer);
+      if (recipient.viewedAt !== null) return null;
+      const at = Date.now();
+      await this.commit(ref, at, {
+        recipients: [{ id: recipient.id, patch: { status: "viewed", viewedAt: at } }],
+        events: await this.events(ref, signerActor(signer), at, [
+          { action: "viewed", detail: { recipientId: recipient.id } },
+        ]),
+      });
+      return null;
+    });
+  }
+
+  /** Emails a fresh Signing code to the address the link was sent to; the previous code stops working. */
+  async sendCode(ref: EnvelopeRef, signer: Signer): Promise<EnvelopeOutcome<null>> {
+    return this.mutate(ref, async () => {
+      const { envelope, recipient } = await this.signerTurn(ref, signer);
+      const { code, codeHash } = await mintSigningCode(this.env, recipient.id);
+      await emailSender(this.env).send({
+        to: recipient.email,
+        subject: `Your signing code for "${envelope.title}"`,
+        text: [
+          `Hi ${recipient.name},`,
+          "",
+          `Your code to open "${envelope.title}" for signing is ${code}.`,
+          "It expires in 10 minutes. If you did not ask for it, you can ignore this email.",
+        ].join("\n"),
+      });
+      const at = Date.now();
+      await this.commit(ref, at, {
+        recipients: [
+          {
+            id: recipient.id,
+            patch: { codeHash, codeExpiresAt: at + SIGNING_CODE.ttlMs, codeAttempts: 0 },
+          },
+        ],
+        events: await this.events(ref, signerActor(signer), at, [
+          { action: "code_sent", detail: { recipientId: recipient.id, email: recipient.email } },
+        ]),
+      });
+      return null;
+    });
+  }
+
+  /**
+   * Checks a Signing code. A right one is used up and audited with the signer's IP and user
+   * agent; the fifth wrong one invalidates the code.
+   */
+  async verifyCode(ref: EnvelopeRef, signer: Signer, code: string): Promise<EnvelopeOutcome<null>> {
+    return this.mutate(ref, async () => {
+      const { recipient, secrets } = await this.signerTurn(ref, signer);
+      const at = Date.now();
+      if (secrets.codeHash === null || (secrets.codeExpiresAt ?? 0) <= at) {
+        throw new AppError("unauthenticated", "This code has expired. Ask for a new one.");
+      }
+      if (!(await signingCodeMatches(this.env, recipient.id, code, secrets.codeHash))) {
+        const attempts = secrets.codeAttempts + 1;
+        const spent = attempts >= SIGNING_CODE.maxAttempts;
+        await this.commit(ref, at, {
+          recipients: [
+            {
+              id: recipient.id,
+              patch: {
+                codeAttempts: attempts,
+                ...(spent ? { codeHash: null, codeExpiresAt: null } : {}),
+              },
+            },
+          ],
+          events: [],
+        });
+        throw new AppError(
+          "unauthenticated",
+          spent ? "Too many wrong codes. Ask for a new one." : "That code is not right",
+        );
+      }
+      await this.commit(ref, at, {
+        recipients: [
+          {
+            id: recipient.id,
+            patch: {
+              codeHash: null,
+              codeExpiresAt: null,
+              codeAttempts: 0,
+              verifiedIp: signer.ip,
+              verifiedUserAgent: signer.userAgent,
+            },
+          },
+        ],
+        events: await this.events(ref, signerActor(signer), at, [
+          {
+            action: "verified",
+            detail: { recipientId: recipient.id, email: recipient.email, method: "email_code" },
+          },
+        ]),
+      });
+      return null;
+    });
+  }
+
+  /**
+   * Fills the signer's Fields and records their signature. In sequential order the next
+   * routing order is notified in the same change; once every signer has signed the
+   * Envelope moves on to `allSigned`.
+   */
+  async sign(
+    ref: EnvelopeRef,
+    signer: Signer,
+    input: SignerSign,
+    origin: string,
+  ): Promise<EnvelopeOutcome<null>> {
+    return this.mutate(ref, async () => {
+      const { envelope, recipients, recipient } = await this.signerTurn(ref, signer);
+      const fields = await listFields(ref.tenantId, this.env, ref.envelopeId);
+      for (const id of Object.keys(input.values)) {
+        const field = fields.find((f) => f.id === id);
+        if (!field) throw new AppError("invalid_input", "That field is not on this envelope");
+        if (field.recipientId !== recipient.id) {
+          throw new AppError("invalid_input", "That field belongs to another recipient");
+        }
+      }
+      const at = Date.now();
+      const values = fields
+        .filter((f) => f.recipientId === recipient.id)
+        .map((field) => {
+          const given = input.values[field.id];
+          const value = field.kind === "date" ? signingDate(at) : given?.trim() ? given : null;
+          if (field.required && !fieldFilled(field.kind, value)) {
+            throw new AppError("invalid_input", "Fill in every required field before you finish");
+          }
+          const problem = value === null ? null : fieldValueProblem(field.kind, value);
+          if (problem !== null) throw new AppError("invalid_input", problem);
+          return { field, value };
+        });
+
+      const after = recipients.map((r) =>
+        r.id === recipient.id ? { ...r, status: "signed" as const } : r,
+      );
+      const turn = nextTurn(after, envelope.orderMode);
+      const sender =
+        turn.length > 0 ? await envelopeSender(this.env, ref.tenantId, envelope) : null;
+      const notified = sender ? await this.notify(envelope, turn, sender, origin, "invite") : [];
+      await this.commit(ref, at, {
+        recipients: [
+          { id: recipient.id, patch: { status: "signed", signedAt: at, codeHash: null } },
+          ...notified.map((n) => ({
+            id: n.id,
+            patch: { status: "sent" as const, tokenHash: n.tokenHash, notifiedAt: at },
+          })),
+        ],
+        fields: values.map(({ field, value }) => ({ id: field.id, value })),
+        events: await this.events(ref, signerActor(signer), at, [
+          {
+            action: "signed",
+            detail: {
+              recipientId: recipient.id,
+              consent: CONSENT_TEXT,
+              fields: values.map(({ field, value }) => ({
+                id: field.id,
+                kind: field.kind,
+                ...signedValue(field.kind, value),
+              })),
+            },
+          },
+          ...notified.map((n) => ({
+            action: "notified" as const,
+            detail: { recipientId: n.id, email: n.email },
+          })),
+        ]),
+      });
+      if (everySignerSigned(after)) await this.allSigned(ref, envelope);
+      return null;
+    });
+  }
+
+  /** Ends the Envelope at the signer's request: every link stops working and the sender is told. */
+  async decline(ref: EnvelopeRef, signer: Signer, reason: string): Promise<EnvelopeOutcome<null>> {
+    return this.mutate(ref, async () => {
+      const { envelope, recipient } = await this.signerTurn(ref, signer);
+      const status = this.next(envelope, "declined");
+      const at = Date.now();
+      await this.commit(ref, at, {
+        envelope: { status },
+        recipients: [
+          {
+            id: recipient.id,
+            patch: { status: "declined", declinedAt: at, declineReason: reason, codeHash: null },
+          },
+        ],
+        events: await this.events(ref, signerActor(signer), at, [
+          { action: "declined", detail: { recipientId: recipient.id, reason } },
+        ]),
+      });
+      const sender = await envelopeSender(this.env, ref.tenantId, envelope);
+      if (sender.email) {
+        await this.mailAll([
+          {
+            to: sender.email,
+            subject: `${recipient.name} declined to sign "${envelope.title}"`,
+            text: [
+              `Hi ${sender.name},`,
+              "",
+              `${recipient.name} (${recipient.email}) declined to sign "${envelope.title}".`,
+              `Reason: ${reason}`,
+              "",
+              "The envelope is closed and its signing links no longer work.",
+            ].join("\n"),
+          },
+        ]);
+      }
+      return null;
+    });
+  }
+
+  /**
+   * T3.5 seam: every signer has signed. For now this only moves the Envelope to
+   * `completing`; T3.5 starts finalize (stamp, certificate, seal) from here.
+   */
+  private async allSigned(ref: EnvelopeRef, envelope: EnvelopeRow): Promise<void> {
+    await this.commit(ref, Date.now(), {
+      envelope: { status: this.next(envelope, "completing") },
+      events: [],
+    });
+  }
+
+  /**
+   * The Envelope and Recipient behind a signer's link, while it is still their turn: a sent,
+   * unexpired Envelope, a signer who has neither signed nor declined, and the link's hash
+   * still the one stored (a reminder replaces it). Anything else is the same 404.
+   */
+  private async signerTurn(ref: EnvelopeRef, signer: Signer) {
+    const [envelope, recipients, secrets] = await Promise.all([
+      this.envelope(ref),
+      listRecipients(ref.tenantId, this.env, ref.envelopeId),
+      readSignerSecrets(ref.tenantId, this.env, ref.envelopeId, signer.recipientId),
+    ]);
+    const recipient = recipients.find((r) => r.id === signer.recipientId);
+    const open =
+      envelope.status === "sent" &&
+      (envelope.expiresAt ?? Infinity) > Date.now() &&
+      recipient?.role === "signer" &&
+      PENDING.includes(recipient.status) &&
+      secrets?.tokenHash === signer.tokenHash;
+    if (!open) throw linkGone();
+    return { envelope, recipients, recipient, secrets };
+  }
+
   /** Runs one mutation alone; an AppError becomes a refusal instead of resetting the object. */
   private async mutate<T>(ref: EnvelopeRef, run: () => Promise<T>): Promise<EnvelopeOutcome<T>> {
     const expected = this.env.ENVELOPES.idFromName(`${ref.tenantId}/${ref.envelopeId}`);
@@ -421,6 +727,7 @@ export class Envelope extends DurableObject<Env> {
     change: {
       envelope?: EnvelopePatch;
       recipients?: { id: RecipientId; patch: RecipientPatch }[];
+      fields?: { id: FieldId; value: string | null }[];
       events: AuditEvent[];
     },
   ): Promise<void> {
@@ -431,7 +738,7 @@ export class Envelope extends DurableObject<Env> {
   private async notify(
     envelope: EnvelopeRow,
     recipients: readonly RecipientRow[],
-    sender: Sender,
+    sender: Pick<Sender, "name" | "email">,
     origin: string,
     kind: "invite" | "reminder",
   ): Promise<{ id: RecipientId; email: string; tokenHash: string }[]> {
