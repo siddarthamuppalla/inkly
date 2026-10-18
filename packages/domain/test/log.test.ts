@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { step, type StepLog } from "../src/log.ts";
 
+// packages/domain has no DOM or Node types; log.ts declares console the same way.
+declare const console: { log(line: string): void };
+
 function stepLines(spy: { mock: { calls: unknown[][] } }): StepLog[] {
   return spy.mock.calls.map((call) => JSON.parse(String(call[0])) as StepLog);
 }
