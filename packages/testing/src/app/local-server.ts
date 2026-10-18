@@ -142,3 +142,25 @@ export async function startLocalWorker(
   }
   return { baseUrl, secret, stop };
 }
+
+/**
+ * The Worker's error lines in the captured `wrangler dev` output: each `unhandled_error`
+ * event (a 500 from `onAppError`, with its stack) and each error wrangler itself reports.
+ */
+export function workerErrors(log: readonly string[], max = 20): string[] {
+  const lines = log.join("").split("\n");
+  const errors: string[] = [];
+  for (const line of lines) {
+    if (line.includes('"event":"unhandled_error"')) {
+      try {
+        const e = JSON.parse(line.slice(line.indexOf("{"))) as { message?: string; stack?: string };
+        errors.push(`unhandled_error: ${e.stack || e.message || line}`);
+      } catch {
+        errors.push(line);
+      }
+    } else if (line.includes("✘ [ERROR]")) {
+      errors.push(line.trim());
+    }
+  }
+  return errors.slice(0, max);
+}

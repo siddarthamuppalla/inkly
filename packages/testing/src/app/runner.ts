@@ -95,7 +95,10 @@ export async function runJourneys(
       });
       page.on("pageerror", (e) => consoleErrors.push(`uncaught: ${e.message}`));
       context.on("response", (r) => {
-        if (r.status() >= 500) serverErrors.push(`${String(r.status())} ${r.url()}`);
+        if (r.status() >= 500) {
+          const id = r.headers()["x-inkly-request-id"];
+          serverErrors.push(`${String(r.status())} ${r.url()}${id ? ` (request ${id})` : ""}`);
+        }
         const url = new URL(r.url());
         if (url.origin === origin) {
           requests.push({ method: r.request().method(), path: url.pathname, status: r.status() });
