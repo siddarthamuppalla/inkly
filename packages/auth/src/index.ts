@@ -13,7 +13,19 @@ export {
 export { testHooksOn, type AuthEnv } from "./env.ts";
 export { handleAuthRequest, CODE_REQUEST_LIMIT, CODE_REQUEST_WINDOW_MS } from "./handler.ts";
 export { mintDocumentId, mintEnvelopeId, mintFieldId, mintJobId, mintRecipientId } from "./ids.ts";
-export { mintSignerToken } from "./signers.ts";
+export {
+  issueSignerGrant,
+  mintSignerToken,
+  mintSigningCode,
+  resolveSignerToken,
+  signerVerified,
+  signingCodeMatches,
+  signingCodeSendAllowed,
+  type GoneSigner,
+  type OpenSigner,
+  type ResolvedSigner,
+  type SignedSigner,
+} from "./signers.ts";
 export { tenantOfQueuedJob } from "./queue.ts";
 export { expireSeededSession, readAccessLog, seedAccount, type SeededAccount } from "./seed.ts";
 export {

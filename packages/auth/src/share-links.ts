@@ -16,7 +16,7 @@ import { newId } from "./ids.ts";
 
 const encoder = new TextEncoder();
 const TOKEN_BYTES = 32;
-const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+export const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 /** Workers caps PBKDF2 at 100,000 iterations; we use the cap. */
 const PBKDF2_ITERATIONS = 100_000;
 const SALT_BYTES = 16;
@@ -25,14 +25,14 @@ export const UNLOCK_ATTEMPT_LIMIT = 10;
 export const UNLOCK_WINDOW_MS = 10 * 60 * 1000;
 export const SHARE_GRANT_TTL_MS = 60 * 60 * 1000;
 
-function base64url(bytes: Uint8Array): string {
+export function base64url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes))
     .replaceAll("+", "-")
     .replaceAll("/", "_")
     .replace(/=+$/, "");
 }
 
-function fromBase64url(text: string): Uint8Array | null {
+export function fromBase64url(text: string): Uint8Array | null {
   try {
     const b64 = text.replaceAll("-", "+").replaceAll("_", "/");
     return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -41,11 +41,11 @@ function fromBase64url(text: string): Uint8Array | null {
   }
 }
 
-function equalBytes(a: Uint8Array, b: Uint8Array): boolean {
+export function equalBytes(a: Uint8Array, b: Uint8Array): boolean {
   return a.byteLength === b.byteLength && crypto.subtle.timingSafeEqual(a, b);
 }
 
-async function sha256Hex(text: string): Promise<string> {
+export async function sha256Hex(text: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(text));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -139,7 +139,8 @@ export async function unlockAttemptAllowed(env: AuthEnv, linkId: ShareLinkId): P
   return count <= UNLOCK_ATTEMPT_LIMIT;
 }
 
-async function grantSignature(env: AuthEnv, link: OpenShareLink, exp: number): Promise<Uint8Array> {
+/** HMAC-SHA256 of `message` under BETTER_AUTH_SECRET, for grants this Worker issues and checks. */
+export async function hmacSha256(env: AuthEnv, message: string): Promise<Uint8Array> {
   const secret = env.BETTER_AUTH_SECRET;
   if (!secret) throw new AppError("internal", "BETTER_AUTH_SECRET is not set");
   const key = await crypto.subtle.importKey(
@@ -149,8 +150,11 @@ async function grantSignature(env: AuthEnv, link: OpenShareLink, exp: number): P
     false,
     ["sign"],
   );
-  const message = `share-unlock|${link.linkId}|${String(exp)}|${link.passwordHash ?? ""}`;
   return new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(message)));
+}
+
+function grantSignature(env: AuthEnv, link: OpenShareLink, exp: number): Promise<Uint8Array> {
+  return hmacSha256(env, `share-unlock|${link.linkId}|${String(exp)}|${link.passwordHash ?? ""}`);
 }
 
 /** A grant proving this browser entered the link's password, valid for one hour. */

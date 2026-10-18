@@ -17,9 +17,10 @@ import type { StorageEnv } from "./env.ts";
 import { usagePeriod } from "./usage.ts";
 
 // `@inkly/storage/envelopes`: every write to envelopes, recipients, fields and audit_events,
-// plus the Envelope Usage claim. Lint lets only the Envelope Durable Object import this, so
-// it is the single writer of each Envelope (ADR-0006). Each call is one D1 batch, so a
-// state change and the audit events that record it land together or not at all.
+// plus the Envelope Usage claim and the one read of a Recipient's link and code hashes. Lint
+// lets only the Envelope Durable Object import this, so it is the single writer of each
+// Envelope (ADR-0006). Each call is one D1 batch, so a state change and the audit events
+// that record it land together or not at all.
 
 export interface NewEnvelope {
   id: EnvelopeId;
@@ -284,6 +285,29 @@ export async function commitEnvelope(
     );
   }
   await env.DB.batch([...statements, ...insertEvents(env, tenantId, change.events)]);
+}
+
+/** What only the Envelope DO may read about a Recipient: its link and Signing code hashes. */
+export interface SignerSecrets {
+  tokenHash: string | null;
+  codeHash: string | null;
+  codeExpiresAt: number | null;
+  codeAttempts: number;
+}
+
+export async function readSignerSecrets(
+  tenantId: TenantId,
+  env: StorageEnv,
+  envelopeId: EnvelopeId,
+  recipientId: RecipientId,
+): Promise<SignerSecrets | null> {
+  return env.DB.prepare(
+    `SELECT token_hash AS tokenHash, code_hash AS codeHash, code_expires_at AS codeExpiresAt,
+       code_attempts AS codeAttempts
+     FROM recipients WHERE tenant_id = ?1 AND envelope_id = ?2 AND id = ?3`,
+  )
+    .bind(tenantId, envelopeId, recipientId)
+    .first<SignerSecrets>();
 }
 
 /**

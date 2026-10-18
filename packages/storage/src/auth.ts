@@ -142,6 +142,34 @@ export interface ShareLinkTarget {
   documentDeletedAt: number | null;
 }
 
+/** A Recipient found by its signer token's sha256, before anything is known about its Tenant. */
+export interface SignerTarget {
+  tenantId: string;
+  envelopeId: string;
+  recipientId: string;
+  role: string;
+  recipientStatus: string;
+  envelopeStatus: string;
+  documentId: string;
+  version: number;
+  expiresAt: number | null;
+}
+
+export async function findRecipientByTokenHash(
+  env: StorageEnv,
+  tokenHash: string,
+): Promise<SignerTarget | null> {
+  return env.DB.prepare(
+    `SELECT r.tenant_id AS tenantId, r.envelope_id AS envelopeId, r.id AS recipientId,
+       r.role, r.status AS recipientStatus, e.status AS envelopeStatus,
+       e.document_id AS documentId, e.version, e.expires_at AS expiresAt
+     FROM recipients r JOIN envelopes e ON e.tenant_id = r.tenant_id AND e.id = r.envelope_id
+     WHERE r.token_hash = ?1`,
+  )
+    .bind(tokenHash)
+    .first<SignerTarget>();
+}
+
 export async function findShareLinkByTokenHash(
   env: StorageEnv,
   tokenHash: string,
