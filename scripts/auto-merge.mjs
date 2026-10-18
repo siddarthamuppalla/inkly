@@ -17,6 +17,7 @@ export const REQUIRED_CHECKS = [
   "verify-perf",
   "verify-app",
   "verify-tenancy",
+  "verify-signing",
   "audit",
   "prod-config",
   "secrets",

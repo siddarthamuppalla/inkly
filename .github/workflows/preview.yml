@@ -43,9 +43,18 @@ jobs:
         with: { node-version-file: .nvmrc, cache: pnpm }
       - if: steps.secrets.outputs.ready == 'true'
         run: pnpm i --frozen-lockfile
-      # J-009 and J-010 validate saved and annotated PDFs with verify-pdf.
+      # J-009, J-010 and J-017 validate saved, annotated and signed PDFs with verify-pdf;
+      # verify-signing checks the sealed PDF with qpdf, pdftotext and pyHanko.
       - if: steps.secrets.outputs.ready == 'true'
         run: sudo apt-get update && sudo apt-get install -y qpdf poppler-utils
+      - if: steps.secrets.outputs.ready == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: .claude/skills/verify-pdf/requirements.txt
+      - if: steps.secrets.outputs.ready == 'true'
+        run: pip install -r .claude/skills/verify-pdf/requirements.txt && pyhanko --version
       - name: deploy inkly-pr-${{ github.event.pull_request.number }}
         if: steps.secrets.outputs.ready == 'true'
         id: deploy
@@ -94,6 +103,7 @@ jobs:
           pnpm --filter @inkly/testing exec playwright install --with-deps chromium
           .claude/skills/verify-app/run.sh --url "$URL" --all
           .claude/skills/verify-tenancy/run.sh --url "$URL"
+          .claude/skills/verify-signing/run.sh --url "$URL"
       # Reported, not gating: on real Cloudflare, split is over the 3 s bound on main today (#54).
       # The ci.yml verify-perf job still gates the in-Worker ops.
       - name: verify-perf on the preview (report only, #54)
@@ -134,7 +144,7 @@ jobs:
         with:
           script: |
             const marker = "<!-- inkly-preview -->";
-            const body = `${marker}\nPreview: ${process.env.URL}\n\nCommit ${context.payload.pull_request.head.sha.slice(0, 7)}: \`/health\` 200, verify-app (every journey) and verify-tenancy passed against it.`;
+            const body = `${marker}\nPreview: ${process.env.URL}\n\nCommit ${context.payload.pull_request.head.sha.slice(0, 7)}: \`/health\` 200, verify-app (every journey), verify-tenancy and verify-signing passed against it.`;
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
             const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
