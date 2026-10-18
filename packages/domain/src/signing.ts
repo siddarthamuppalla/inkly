@@ -60,7 +60,9 @@ export const SignerEnvelope = z.discriminatedUnion("status", [
   z.object({
     status: z.literal("signed"),
     title: z.string(),
-    /** True once the Envelope is completed and the sealed PDF can be downloaded. */
+    /** A CC's link only ever shows this state, once the Envelope is completed. */
+    role: z.enum(["signer", "cc"]),
+    /** True from completion for 30 days: `GET …/content` then returns the sealed PDF. */
     signedAvailable: z.boolean(),
   }),
   z.object({

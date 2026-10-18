@@ -8,3 +8,11 @@ import { isWellFormedId, type TenantId } from "@inkly/domain";
 export function tenantOfQueuedJob(raw: unknown): TenantId | null {
   return typeof raw === "string" && isWellFormedId(raw) ? (raw as TenantId) : null;
 }
+
+/**
+ * The TenantId an EnvelopeLifecycle Workflow instance carries in its params. Only the
+ * Envelope DO starts one, with the TenantId of the Envelope it writes, so the same trust holds.
+ */
+export function tenantOfLifecycle(raw: unknown): TenantId | null {
+  return tenantOfQueuedJob(raw);
+}

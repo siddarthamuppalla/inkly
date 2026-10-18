@@ -9,7 +9,7 @@ import { Signature } from "../components/brand/signature.tsx";
 import { Wordmark } from "../components/brand/wordmark.tsx";
 import { Page } from "../components/page.tsx";
 import { PageCanvas, usePdf } from "../components/pdf-pages.tsx";
-import { Button } from "../components/ui/button.tsx";
+import { Button, buttonVariants } from "../components/ui/button.tsx";
 import { Field } from "../components/ui/field.tsx";
 import { ApiError, errorMessage } from "../lib/api.ts";
 import { cn } from "../lib/cn.ts";
@@ -54,7 +54,13 @@ export function SignRoute() {
         {outcome !== null && <Done outcome={outcome} title={data?.title ?? ""} />}
         {outcome === null && envelope.isError && <Gone error={envelope.error} />}
         {outcome === null && data?.status === "signed" && (
-          <Done outcome="signed" title={data.title} signedAvailable={data.signedAvailable} />
+          <Done
+            outcome="signed"
+            title={data.title}
+            token={token}
+            role={data.role}
+            signedAvailable={data.signedAvailable}
+          />
         )}
         {outcome === null && data?.status === "pending" && !data.verified && (
           <Verify
@@ -97,10 +103,14 @@ function Gone({ error }: { readonly error: unknown }) {
 function Done({
   outcome,
   title,
+  token = "",
+  role = "signer",
   signedAvailable = false,
 }: {
   readonly outcome: Outcome;
   readonly title: string;
+  readonly token?: string;
+  readonly role?: "signer" | "cc";
   readonly signedAvailable?: boolean;
 }) {
   if (outcome === "declined") {
@@ -113,14 +123,23 @@ function Done({
     );
   }
   return (
-    <Page title="You signed" lede={title}>
+    <Page title={role === "cc" || signedAvailable ? "Everyone signed" : "You signed"} lede={title}>
       <div className="flex max-w-prose flex-col gap-4" data-testid="sign-done">
         <Signature className="w-48 text-link" />
-        <p>
-          {signedAvailable
-            ? "Everyone has signed. The signed copy is ready."
-            : "Thank you. We'll email you a copy of the signed document once everyone has signed."}
-        </p>
+        {signedAvailable ? (
+          <>
+            <p>The signed PDF, with its Certificate of completion, is ready.</p>
+            <a
+              href={`/api/sign/${encodeURIComponent(token)}/content`}
+              download={`${title}.pdf`}
+              className={buttonVariants({ className: "self-start no-underline" })}
+            >
+              Download the signed PDF
+            </a>
+          </>
+        ) : (
+          <p>Thank you. We'll email you a copy of the signed document once everyone has signed.</p>
+        )}
       </div>
     </Page>
   );

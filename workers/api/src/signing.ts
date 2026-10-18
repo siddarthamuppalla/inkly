@@ -5,6 +5,7 @@ import {
   signingCodeSendAllowed,
   type OpenSigner,
   type ResolvedSigner,
+  type SignedSigner,
 } from "@inkly/auth";
 import {
   AppError,
@@ -22,10 +23,12 @@ import {
   listFields,
   listRecipients,
   openVersion,
+  type EnvelopeRow,
 } from "@inkly/storage";
 import { Hono, type Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 
+import { SIGNED_PDF_DAYS, signedPdf } from "./envelope/content.ts";
 import { envelopeSender, signerObject, type EnvelopeOutcome, type Signer } from "./envelope/do.ts";
 import type { Env } from "./env.ts";
 import { parseJson } from "./errors.ts";
@@ -48,6 +51,19 @@ signingRoutes.use("*", async (c, next) => {
   c.header("referrer-policy", "no-referrer");
   c.header("x-robots-tag", "noindex");
 });
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Whether `GET …/content` serves the sealed PDF: completed, and for SIGNED_PDF_DAYS after. */
+function signedPdfAvailable(envelope: EnvelopeRow, now: number): boolean {
+  const { status, finalVersion, completedAt } = envelope;
+  return (
+    status === "completed" &&
+    finalVersion !== null &&
+    completedAt !== null &&
+    now <= completedAt + SIGNED_PDF_DAYS * DAY_MS
+  );
+}
 
 const ipOf = (c: SignContext) => c.req.header("cf-connecting-ip") ?? null;
 const userAgentOf = (c: SignContext) => c.req.header("user-agent") ?? null;
@@ -157,7 +173,8 @@ signingRoutes.get("/:token", async (c) => {
     const done: SignerEnvelope = {
       status: "signed",
       title: envelope.title,
-      signedAvailable: signer.completed,
+      role: signer.role,
+      signedAvailable: signedPdfAvailable(envelope, Date.now()),
     };
     return c.json(done);
   }
@@ -224,7 +241,17 @@ signingRoutes.post("/:token/verify", async (c) => {
   return c.body(null, 204);
 });
 
+/** The sealed PDF for a link of a completed Envelope; no code is needed, as the link itself was just mailed. */
+async function signedContent(c: SignContext, signer: SignedSigner): Promise<Response> {
+  const envelope = await getEnvelope(signer.tenantId, c.env, signer.envelopeId);
+  const pdf = envelope && (await signedPdf(signer.tenantId, c.env, envelope));
+  await logSigner(c, signer, pdf ? "download" : "read-content", pdf ? 200 : 404);
+  return pdf ?? c.json(GONE, 404);
+}
+
 signingRoutes.get("/:token/content", async (c) => {
+  const resolved = await resolve(c);
+  if (resolved?.kind === "signed") return signedContent(c, resolved);
   const signer = await verifiedSigner(c, "read-content");
   if (signer instanceof Response) return signer;
   const opened = await openVersion(signer.tenantId, c.env, signer.documentId, signer.version);

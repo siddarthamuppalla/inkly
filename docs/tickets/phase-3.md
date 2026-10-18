@@ -69,6 +69,27 @@ Recipient ids (`rcp_…`, kept across saves); missing ids are minted. Responses 
 **Remind:** only token hashes are stored, so a reminder mints a fresh link per pending
 signer and the previous link stops working.
 
+**Completion (T3.5):** T3.3 ends the last signature by calling the DO's public
+`markAllSigned(ref, origin)` after its sign mutation (it takes its own
+`blockConcurrencyWhile`; inside a mutation call the private `beginCompletion(ref, envelope,
+origin)` instead). It refuses (409) unless every signer is `signed`, sets `completing` (no
+audit event: the contract has no `completing` action) and sends the `all-signed` event to
+the `EnvelopeLifecycle` instance, starting one if none exists. The Workflow then calls
+`finalize(ref, origin)`, which commits `completed`, `completed_at`, `final_version` and a
+`completed` event `{ version, sha256 }` with actor `system`. Workflow reminders are
+`reminded` events with actor `system` and `detail.round`, so a retried round sends nothing
+twice; `expired` carries `{ expiresAt }`. Void terminates the instance; on decline (T3.3)
+or any other end state the loop stops at its next round, or T3.3 may terminate it the same
+way. Completion mints a fresh link for every Recipient (signers too, since only hashes are
+stored), so the invite link stops working and the completion email's link downloads the
+signed PDF for 30 days: T3.3's `GET /api/sign/:token/content` returns
+`signedPdf(tenantId, env, envelope)` from `workers/api/src/envelope/content.ts` (null before
+completion or after the 30 days). While finalize writes its Version, the sealed sha256 sits
+in the Envelope DO's own storage (key `sealing`) so a retry reuses a Version that landed.
+`GET /api/seal-certificate` answers `application/x-pem-file`. Previews name the Workflow
+`inkly-pr-<n>-envelope-lifecycle` (names are per account); production becomes
+`inkly-envelope-lifecycle` the same way.
+
 **Statuses:** Envelope `draft | sent | completing | completed | declined | voided |
 expired`; Recipient `waiting | sent | viewed | signed | declined` (CCs stay `waiting`
 until completion). Audit actions: `created, sent, notified, viewed, code_sent, verified,

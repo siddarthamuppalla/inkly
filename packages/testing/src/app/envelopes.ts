@@ -140,6 +140,16 @@ const J016: Journey = {
     expect(deleted.status === 204, `DELETE ${sparePath} returned ${String(deleted.status)}`);
     const gone = await api(ctx, "GET", sparePath);
     expect(gone.status === 404, `a deleted draft returned ${String(gone.status)}`);
+
+    // T3.5: the Document seal certificate is public, so anyone can check a sealed PDF.
+    const seal = await page.evaluate<{ status: number; text: string }, string>(
+      (p) => fetch(p).then(async (r) => ({ status: r.status, text: await r.text() })),
+      "/api/seal-certificate",
+    );
+    expect(
+      seal.status === 200 && seal.text.includes("-----BEGIN CERTIFICATE-----"),
+      `GET /api/seal-certificate returned ${String(seal.status)}`,
+    );
   },
 };
 

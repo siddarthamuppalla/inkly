@@ -43,9 +43,14 @@ export interface OpenSigner extends SignerBase {
   readonly tokenHash: string;
 }
 
-/** The link of a Recipient who signed: it shows the done state, never the document. */
+/**
+ * The link of a Recipient who signed, or of any Recipient once the Envelope is completed
+ * (completion mails everyone a fresh one): it shows the done state, and once completed the
+ * signed PDF, never the document being signed.
+ */
 export interface SignedSigner extends SignerBase {
   readonly kind: "signed";
+  readonly role: "signer" | "cc";
   readonly completed: boolean;
 }
 
@@ -73,9 +78,11 @@ export async function resolveSignerToken(
     documentId: row.documentId as DocumentId,
   };
   const signing = row.envelopeStatus === "sent" && (row.expiresAt ?? Infinity) > now;
-  const finishing = row.envelopeStatus === "completing" || row.envelopeStatus === "completed";
-  if (row.recipientStatus === "signed" && (signing || finishing)) {
-    return { ...base, kind: "signed", completed: row.envelopeStatus === "completed" };
+  const completed = row.envelopeStatus === "completed";
+  const finishing = completed || row.envelopeStatus === "completing";
+  const role = row.role === "cc" ? "cc" : "signer";
+  if ((row.recipientStatus === "signed" && (signing || finishing)) || completed) {
+    return { ...base, kind: "signed", role, completed };
   }
   const pending = row.role === "signer" && ["sent", "viewed"].includes(row.recipientStatus);
   if (!signing || !pending) return { ...base, kind: "gone" };

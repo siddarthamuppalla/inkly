@@ -26,7 +26,7 @@ export {
   type ResolvedSigner,
   type SignedSigner,
 } from "./signers.ts";
-export { tenantOfQueuedJob } from "./queue.ts";
+export { tenantOfLifecycle, tenantOfQueuedJob } from "./queue.ts";
 export { expireSeededSession, readAccessLog, seedAccount, type SeededAccount } from "./seed.ts";
 export {
   authenticate,

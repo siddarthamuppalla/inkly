@@ -9,6 +9,8 @@ import {
   type RecipientInfo,
   type SignerEnvelope,
 } from "@inkly/domain";
+import { introspectWorkflowInstance } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import app from "../src/index.ts";
@@ -335,7 +337,12 @@ describe("a verified signer", () => {
     });
     expect(JSON.stringify(signed?.detail)).not.toContain(PNG);
 
-    expect(await info(token)).toEqual({ status: "signed", title: "Lease", signedAvailable: false });
+    expect(await info(token)).toEqual({
+      status: "signed",
+      title: "Lease",
+      role: "signer",
+      signedAvailable: false,
+    });
     expect(
       await (await visit(`/api/sign/${token}/content`, { headers: { cookie } })).json(),
     ).toEqual(GONE);
@@ -535,6 +542,66 @@ describe("links that no longer work", () => {
     const denied = (await accessLog(owner.tenantId)).filter((e) => e.status === 404);
     // Voided and expired links are still logged to their Tenant; a reminded-over token is unknown.
     expect(denied).toHaveLength(12);
+  });
+});
+
+describe("after completion", () => {
+  it("retires the signing link and serves the sealed PDF on the completion link for 30 days", async () => {
+    const owner = await seed();
+    const doc = await uploaded(owner, "tiny.pdf");
+    const ana = person("ana");
+    const cy = { ...person("cy"), role: "cc" as const };
+    const created = await as(owner, "/api/envelopes", json("POST", { documentId: doc.id }));
+    const { envelope } = await created.json<Detail>();
+    await as(
+      owner,
+      `/api/envelopes/${envelope.id}`,
+      json("PUT", { title: "Lease", recipients: [ana, cy], fields: fieldsFor(ana) }),
+    );
+    await using instance = await introspectWorkflowInstance(env.ENVELOPE_LIFECYCLE, envelope.id);
+    await instance.modify(async (m) => {
+      await m.disableRetryDelays();
+    });
+    await as(owner, `/api/envelopes/${envelope.id}/send`, { method: "POST" });
+    const token = await linkOf(ana.email);
+    const cookie = await verify(token, ana.email);
+    const { fields } = await detail(owner, envelope.id);
+    expect((await signAll(token, cookie, fields)).status).toBe(200);
+    await instance.waitForStatus("complete");
+    expect((await detail(owner, envelope.id)).envelope.status).toBe("completed");
+
+    expect(await (await visit(`/api/sign/${token}`)).json()).toEqual(GONE);
+    const sealed = await sha256(
+      await (await as(owner, `/api/envelopes/${envelope.id}/content`)).arrayBuffer(),
+    );
+    for (const [who, role] of [
+      [ana, "signer"],
+      [cy, "cc"],
+    ] as const) {
+      const fresh = await linkOf(who.email);
+      expect(fresh).not.toBe(token);
+      expect(await info(fresh)).toEqual({
+        status: "signed",
+        title: "Lease",
+        role,
+        signedAvailable: true,
+      });
+      const pdf = await visit(`/api/sign/${fresh}/content`);
+      expect(pdf.status).toBe(200);
+      expect(await sha256(await pdf.arrayBuffer())).toBe(sealed);
+    }
+    const downloads = (await accessLog(owner.tenantId)).filter((e) => e.action === "download");
+    expect(downloads.map((e) => e.status)).toEqual([200, 200]);
+
+    await rows(
+      "UPDATE envelopes SET completed_at = ?1 WHERE tenant_id = ?2 AND id = ?3",
+      Date.now() - 31 * 24 * 60 * 60 * 1000,
+      owner.tenantId,
+      envelope.id,
+    );
+    const late = await linkOf(cy.email);
+    expect(await info(late)).toMatchObject({ signedAvailable: false });
+    expect((await visit(`/api/sign/${late}/content`)).status).toBe(404);
   });
 });
 
