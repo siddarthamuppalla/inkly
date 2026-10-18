@@ -68,6 +68,15 @@
     { "tag": "v2-doc-session", "new_sqlite_classes": ["DocSession"] },
     { "tag": "v3-envelope", "new_sqlite_classes": ["Envelope"] },
   ],
+  // T3.5: one EnvelopeLifecycle instance per sent Envelope (ADR-0006). Workflow names are
+  // per account, so cf-deploy-preview renames it per environment.
+  "workflows": [
+    {
+      "name": "envelope-lifecycle",
+      "binding": "ENVELOPE_LIFECYCLE",
+      "class_name": "EnvelopeLifecycle",
+    },
+  ],
   // Local dev and verify-app call a local pdf-engine process instead (workers/jobs/src/env.ts).
   "dev": { "enable_containers": false },
 }

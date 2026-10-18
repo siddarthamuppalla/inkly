@@ -18,17 +18,18 @@ import {
   listFields,
   listMembers,
   listRecipients,
-  openVersion,
   type EnvelopeRow,
 } from "@inkly/storage";
 import { Hono } from "hono";
 
+import { envelopePdf, envelopeVersion } from "./envelope/content.ts";
 import {
   envelopeObject,
   newEnvelopeObject,
   type EnvelopeOutcome,
   type Sender,
 } from "./envelope/do.ts";
+import { sealCertificatePem } from "./envelope/seal-key.ts";
 import type { Env } from "./env.ts";
 import { parseJson } from "./errors.ts";
 import { viewersReadOnly } from "./roles.ts";
@@ -159,22 +160,26 @@ envelopeRoutes.get("/:id/audit", async (c) => {
 
 envelopeRoutes.get("/:id/content", async (c) => {
   const envelope = await findEnvelope(c);
-  const opened =
-    envelope &&
-    (await openVersion(c.get("tenantId"), c.env, envelope.documentId, envelope.version));
-  if (!envelope || !opened) return missing(c, "read-content");
+  const n = envelope && envelopeVersion(envelope);
+  const pdf = envelope && n !== null && (await envelopePdf(c.get("tenantId"), c.env, envelope, n));
+  if (!envelope || !pdf) return missing(c, "read-content");
   await grantAccess(
     c,
     "read-content",
-    `envelope ${envelope.id} document ${envelope.documentId} v${String(envelope.version)}`,
+    `envelope ${envelope.id} document ${envelope.documentId} v${String(n)}`,
   );
-  const filename = `${envelope.title}.pdf`.replace(/[^\x20-\x7e]|["\\]/g, "_");
-  return new Response(opened.object.body, {
-    headers: {
-      "content-type": "application/pdf",
-      "content-length": String(opened.object.size),
-      "content-disposition": `inline; filename="${filename}"`,
-      "cache-control": "private, no-store",
-    },
+  return pdf;
+});
+
+/** `GET /api/seal-certificate`: public, so anyone can check a sealed PDF (ADR-0006). */
+export const sealCertificateRoutes = new Hono<{ Bindings: Env }>();
+
+sealCertificateRoutes.get("/seal-certificate", async (c) => {
+  const pem = await sealCertificatePem(c.env);
+  if (pem === null) throw new AppError("not_found", "No seal certificate is configured");
+  return c.body(`${pem}\n`, 200, {
+    "content-type": "application/x-pem-file",
+    "content-disposition": 'inline; filename="inkly-seal.pem"',
+    "cache-control": "public, max-age=300",
   });
 });
