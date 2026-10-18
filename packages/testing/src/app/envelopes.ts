@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { Locator } from "playwright";
 
 import { fixture, openDocuments, pagesRendered, reach, uploadFromList, WAIT } from "./documents.ts";
+import { checkSignedEnvelope, parseAuditTrail } from "../signing/check.ts";
 import type { Journey, JourneyContext } from "./journeys.ts";
 import { signedIn, type SeededUser } from "./sign-in.ts";
 
@@ -669,4 +670,145 @@ const J018: Journey = {
   },
 };
 
-export const ENVELOPE_JOURNEYS: readonly Journey[] = [J016, J018];
+// J-017: the whole Envelope in the browser. The sender places fields and sends to two
+// signers in sequence; each signs in a browser context of their own; the sender downloads
+// the signed PDF, which must pass verify-signing's checks. Timed from upload to download.
+
+/** A signer's own browser: a fresh context (no cookies, no bearer) whose errors fail the journey. */
+async function signerBrowser(ctx: JourneyContext, label: string) {
+  const browser = ctx.page.context().browser();
+  if (!browser) throw new Error("the journey page has no browser");
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
+  page.on("pageerror", (e) => errors.push(`uncaught: ${e.message}`));
+  context.on("response", (r) => {
+    if (r.status() >= 500) errors.push(`${String(r.status())} ${r.url()}`);
+  });
+  const close = async () => {
+    await context.close();
+    ctx.expect(errors.length === 0, `${label}'s browser errors: ${errors.join(" | ")}`);
+  };
+  return { as: { ...ctx, page } satisfies JourneyContext, close };
+}
+
+/** Signs as the Recipient whose newest link is in `address`'s inbox, in a browser of their own. */
+async function signAs(ctx: JourneyContext, label: string, address: string, text?: string) {
+  const signer = await signerBrowser(ctx, label);
+  try {
+    const { page } = signer.as;
+    await openAndVerify(signer.as, address);
+    if (text !== undefined) {
+      await page.locator('[data-testid="sign-field"][data-kind="text"]').fill(text);
+    }
+    await page.getByRole("button", { name: /^Signature/ }).click();
+    await adoptTyped(signer.as);
+    await page.getByLabel(/^I agree to use electronic records/).check();
+    await page.getByRole("button", { name: "Finish" }).click();
+    await reach(
+      signer.as,
+      page.getByRole("heading", { level: 1, name: "You signed" }).waitFor(WAIT),
+      `${label}'s Finish did not show the signed state`,
+    );
+  } finally {
+    await signer.close();
+  }
+}
+
+const J017: Journey = {
+  id: "J-017",
+  title: "Sign as two signers and download the signed PDF",
+  async run(ctx) {
+    const { page, baseUrl, expect } = ctx;
+    const who = await signedIn(ctx);
+    await openDocuments(ctx);
+
+    const started = performance.now();
+    await uploadFromList(ctx, "tiny.pdf");
+    await page.getByTestId("document-row").getByRole("link", { name: "tiny" }).click();
+    await reach(
+      ctx,
+      page.getByRole("heading", { level: 1, name: "tiny" }).waitFor(WAIT),
+      "the viewer did not open",
+    );
+    const envelopeId = (await newDraft(ctx)).split("/").at(-1) ?? "";
+    const ana = email("j017-ana");
+    const ben = email("j017-ben");
+    const typed = `Unit 7 J-017 ${Math.random().toString(36).slice(2, 8)}`;
+    await page.getByLabel("Title").fill("J-017 lease");
+    await addRecipient(ctx, "Ana Ruiz", ana);
+    await addRecipient(ctx, "Ben Ode", ben);
+    await page.getByLabel("Sequential").check();
+    await pagesRendered(ctx, 1);
+    await fieldsFor(ctx, "Ana Ruiz");
+    await place(ctx, "Signature", 1, 0.3, 0.6);
+    await place(ctx, "Text", 1, 0.3, 0.3);
+    await fieldsFor(ctx, "Ben Ode");
+    await place(ctx, "Signature", 1, 0.3, 0.8);
+    await reach(
+      ctx,
+      page.getByTestId("send-problem").filter({ hasText: "Ready to send." }).waitFor(WAIT),
+      "the J-017 draft is not ready to send",
+    );
+    await saved(ctx, "before send");
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    await reach(
+      ctx,
+      page.getByTestId("envelope-status").filter({ hasText: "Sent" }).waitFor(WAIT),
+      "Send did not show the status page",
+    );
+
+    expect((await signLinks(ctx, ben)).length === 0, "Ben was emailed before Ana signed");
+    await signAs(ctx, "Ana", ana, typed);
+    expect((await signLinks(ctx, ben)).length === 1, "Ben was not emailed after Ana signed");
+    await signAs(ctx, "Ben", ben);
+
+    // The sender's status page, reloaded until the Workflow has sealed the Envelope.
+    const completed = page.getByTestId("envelope-status").filter({ hasText: "Completed" });
+    for (let i = 0; i < 30 && !(await completed.isVisible()); i++) {
+      await page.waitForTimeout(1000);
+      await page.reload();
+      await page
+        .getByTestId("envelope-status")
+        .waitFor(WAIT)
+        .catch(() => undefined);
+    }
+    await reach(ctx, completed.waitFor(WAIT), "the sender's status page never shows Completed");
+    const [download] = await Promise.all([
+      page.waitForEvent("download", WAIT),
+      page.getByRole("button", { name: "Download signed PDF" }).click(),
+    ]);
+    const file = join(ctx.outDir, "J-017-signed.pdf");
+    await download.saveAs(file);
+    const certificate = await page.request.get(
+      new URL("/api/seal-certificate", baseUrl).toString(),
+    );
+    const certificatePem = await certificate.text();
+    ctx.time("upload → 2 signers → signed PDF + certificate", performance.now() - started);
+    expect(
+      certificate.status() === 200,
+      `GET /api/seal-certificate returned ${String(certificate.status())}`,
+    );
+    await ctx.checkpoint("completed");
+
+    const audit = await ctx.page.request.get(
+      new URL(`/api/envelopes/${envelopeId}/audit`, baseUrl).toString(),
+      { headers: { authorization: `Bearer ${who.token}` } },
+    );
+    const report = checkSignedEnvelope({
+      signedPdf: new Uint8Array(readFileSync(file)),
+      originalPages: 1,
+      certificatePem,
+      stampedText: [typed],
+      audit: parseAuditTrail(await audit.json()),
+    });
+    for (const c of report.checks) {
+      expect(c.ok, `the downloaded signed PDF fails verify-signing's ${c.name} check: ${c.detail}`);
+    }
+  },
+};
+
+export const ENVELOPE_JOURNEYS: readonly Journey[] = [J016, J017, J018];

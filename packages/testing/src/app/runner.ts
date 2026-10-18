@@ -19,6 +19,8 @@ export interface JourneyResult {
   /** 4xx responses the journey declared as designed outcomes; reported, never failed on. */
   readonly expectedClientErrors: readonly string[];
   readonly artifacts: readonly string[];
+  /** Success-criterion timings the journey measured, printed with its result. */
+  readonly timings: readonly { readonly name: string; readonly ms: number }[];
   /** Every response from the target, for route coverage. */
   readonly requests: readonly SeenRequest[];
 }
@@ -80,6 +82,7 @@ export async function runJourneys(
       const failedRequests: string[] = [];
       const expectedClientErrors: string[] = [];
       const artifacts: string[] = [];
+      const timings: { name: string; ms: number }[] = [];
       const requests: SeenRequest[] = [];
       const origin = new URL(baseUrl).origin;
       const context = await browser.newContext();
@@ -123,6 +126,9 @@ export async function runJourneys(
           expect: (cond, msg) => {
             if (!cond) failures.push(msg);
           },
+          time: (name, ms) => {
+            timings.push({ name, ms: Math.round(ms) });
+          },
           checkpoint: async (name) => {
             for (const scheme of SCHEMES) {
               await page.emulateMedia({ colorScheme: scheme });
@@ -160,6 +166,7 @@ export async function runJourneys(
         failedRequests,
         expectedClientErrors,
         artifacts,
+        timings,
         requests,
       });
     }
@@ -189,6 +196,7 @@ export function writeSummary(info: RunInfo, results: readonly JourneyResult[]): 
   ];
   for (const r of results) {
     const details = [
+      ...r.timings.map((t) => `- time: ${t.name}: ${String(t.ms)} ms`),
       ...r.failures.map((f) => `- failure: ${f}`),
       ...r.consoleErrors.map((e) => `- console: ${e}`),
       ...r.serverErrors.map((e) => `- 5xx: ${e}`),

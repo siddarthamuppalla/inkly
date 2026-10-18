@@ -131,6 +131,7 @@ async function verify(
       console.log(
         `${r.ok ? "PASS" : "FAIL"} ${r.id} ${r.title}${r.ok ? "" : `: ${r.failures.join("; ")}`}`,
       );
+      for (const t of r.timings) console.log(`  time: ${t.name}: ${String(t.ms)} ms`);
       // CI artifacts can be hard to reach, so a failure carries its last API calls in the log.
       if (!r.ok) {
         for (const e of [...r.consoleErrors, ...r.failedRequests]) console.log(`  ! ${e}`);

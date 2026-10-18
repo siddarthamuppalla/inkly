@@ -18,6 +18,8 @@ export interface JourneyContext {
   readonly outDir: string;
   /** Records a failed expectation; the journey keeps going so the report is complete. */
   readonly expect: (condition: boolean, message: string) => void;
+  /** Records a timed success criterion (e.g. "upload → 2 signers → signed PDF"), printed with the result. */
+  readonly time: (name: string, ms: number) => void;
   /** Screenshots the page in light and dark schemes and runs an axe WCAG 2.1 A/AA scan of each. */
   readonly checkpoint: (name: string) => Promise<void>;
 }
